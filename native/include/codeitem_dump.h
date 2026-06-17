@@ -24,6 +24,7 @@ struct CodeItemDumpTask {
   uint32_t insns_size;
   size_t dump_size;           // total bytes to write (header + insns)
   bool dump_complete;         // false if tries>0 (try/catch not dumped)
+  char source[32];            // "ArtMethodInvoke" or "active_invoke"
   uint8_t* data = nullptr;    // owned buffer
 
   // SHA256 first 8 hex chars for dedup

@@ -90,7 +90,7 @@ public:
         LOGI("pkg=%s", pkg);
 
         // Hard allowlist check (only these packages)
-        static const char* allow[] = {"infosecadventures.allsafe","com.funshion.video.mobile","com.example.farttest",nullptr};
+        static const char* allow[] = {"infosecadventures.allsafe","com.funshion.video.mobile","com.example.farttest","com.farttest.secret2x",nullptr};
         bool hit = false;
         for (int i=0; allow[i]; i++) { if (strcmp(pkg, allow[i])==0) { hit=true; break; }}
         if (!hit) { LOGI("not in hard allowlist"); return; }

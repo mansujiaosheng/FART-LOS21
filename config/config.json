@@ -13,5 +13,10 @@
   "enable_artmethod_hook": false,
   "artmethod_sample_rate": 1000,
   "enable_codeitem_dump": false,
-  "max_codeitem_dumps": 500
+  "max_codeitem_dumps": 500,
+  "enable_active_invoke": false,
+  "active_invoke_delay_ms": 1500,
+  "active_invoke_max_classes": 50,
+  "active_invoke_max_methods": 200,
+  "active_invoke_classes": []
 }

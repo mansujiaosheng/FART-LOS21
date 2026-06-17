@@ -169,6 +169,8 @@ namespace fart {
 
 CodeItemDumpTask::CodeItemDumpTask() {
   sha256_prefix[0] = '\0';
+  source[0] = '\0';
+  strcpy(source, "unknown");
 }
 
 CodeItemDumpTask::~CodeItemDumpTask() {
@@ -345,7 +347,7 @@ bool CodeItemDumper::WriteJsonFile(const CodeItemDumpTask& task) {
       "  \"insns_size\": %u,\n"
       "  \"dump_size\": %zu,\n"
       "  \"dump_complete\": %s,\n"
-      "  \"source\": \"ArtMethodInvoke\"\n"
+      "  \"source\": \"%s\"\n"
       "}\n",
       task.pid, task.tid,
       task.method_idx, task.sha256_prefix,

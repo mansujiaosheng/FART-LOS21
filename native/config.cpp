@@ -124,13 +124,43 @@ bool LoadConfig(Config* config, const char* path) {
   find_uint("\"artmethod_sample_rate\"", &config->artmethod_sample_rate);
   find_bool("\"enable_codeitem_dump\"", &config->enable_codeitem_dump);
   find_uint("\"max_codeitem_dumps\"", &config->max_codeitem_dumps);
+  find_bool("\"enable_active_invoke\"", &config->enable_active_invoke);
+  find_uint("\"active_invoke_delay_ms\"", &config->active_invoke_delay_ms);
+  find_uint("\"active_invoke_max_classes\"", &config->active_invoke_max_classes);
+  find_uint("\"active_invoke_max_methods\"", &config->active_invoke_max_methods);
+  // active_invoke_classes array (reuse existing packages parsing)
+  {
+    auto pos = content.find("\"active_invoke_classes\"");
+    if (pos != std::string::npos) {
+      auto colon = content.find(':', pos);
+      if (colon != std::string::npos) {
+        auto arr_start = content.find('[', colon);
+        if (arr_start != std::string::npos) {
+          auto arr_end = content.find(']', arr_start);
+          if (arr_end != std::string::npos) {
+            std::string arr = content.substr(arr_start + 1, arr_end - arr_start - 1);
+            size_t p = 0;
+            while (true) {
+              auto q = arr.find('"', p);
+              if (q == std::string::npos) break;
+              auto r = arr.find('"', q + 1);
+              if (r == std::string::npos) break;
+              config->active_invoke_classes.push_back(arr.substr(q + 1, r - q - 1));
+              p = r + 1;
+            }
+          }
+        }
+      }
+    }
+  }
   find_packages(&config->packages);
 
-  LOGI("Config loaded: enable=%d, packages=%zu, dump_dex=%d, dump_code_item=%d, active_invoke=%d, artmethod_hook=%d, sample_rate=%u, codeitem_dump=%d, max_dumps=%u",
+  LOGI("Config loaded: enable=%d, packages=%zu, dump_dex=%d, dump_code_item=%d, active_invoke=%d, artmethod_hook=%d, sample_rate=%u, codeitem_dump=%d, max_dumps=%u, active_invoke=%d, classes=%zu",
        config->enable, config->packages.size(),
        config->dump_dex, config->dump_code_item, config->active_invoke,
        config->enable_artmethod_hook, config->artmethod_sample_rate,
-       config->enable_codeitem_dump, config->max_codeitem_dumps);
+       config->enable_codeitem_dump, config->max_codeitem_dumps,
+       config->enable_active_invoke, config->active_invoke_classes.size());
 
   return true;
 }

@@ -6,6 +6,7 @@
 #include "dex_dump.h"
 #include "arm64_hook.h"
 #include "codeitem_dump.h"
+#include "active_invoke.h"
 
 #include <cstdio>
 #include <cstring>
@@ -28,6 +29,9 @@ static thread_local bool g_fart_active_dump = false;
 static thread_local bool g_fart_in_invoke = false;
 static JNIEnv* g_env = nullptr;
 static char g_package[256] = {};
+
+// Stage 2.5: Active invoke flag - must be OUTSIDE anonymous namespace
+__attribute__((visibility("default"))) volatile int g_active_invoke_running = 0;
 
 namespace {
 
@@ -184,7 +188,7 @@ void ArtMethodInvokeHook(void* art_method, void* thread, void* args,
 
     uint32_t rate = g_config.artmethod_sample_rate;
     if (rate == 0) rate = 1000;
-    if (g_invoke_count % rate == 1) {
+    if (g_invoke_count % rate == 0) {
       LOGI("Invoke #%lu: method=%p tid=%d",
            g_invoke_count, art_method, (int)syscall(__NR_gettid));
 
@@ -242,7 +246,10 @@ void ArtMethodInvokeHook(void* art_method, void* thread, void* args,
                 citask.tries_size = tries;
                 citask.insns_size = insns;
                 citask.dump_size = 16 + (size_t)insns * 2;
-                citask.dump_complete = (tries == 0);  // true only if no try/catch blocks
+                citask.dump_complete = (tries == 0);
+                // Mark source: "active_invoke" or "ArtMethodInvoke"
+                snprintf(citask.source, sizeof(citask.source), "%s",
+                         g_active_invoke_running ? "active_invoke" : "ArtMethodInvoke");
 
                 // Sync memcpy to owned buffer (safe copy)
                 if (citask.CopyData(ci, citask.dump_size)) {
@@ -538,6 +545,20 @@ void fart_on_app_specialize(JNIEnv* env, const char* package_name, const char* m
   if (SetupHooks()) {
     // Snapshot: dump already-loaded dex files
     DumpAlreadyLoadedDex(env);
+
+    // Stage 2.5: Start active invoke engine (if enabled)
+    if (g_config.enable_active_invoke &&
+        g_config.enable_artmethod_hook &&
+        !g_config.active_invoke_classes.empty()) {
+      static ActiveInvokeEngine* g_active_invoke_engine = nullptr;
+      if (g_active_invoke_engine == nullptr) {
+        g_active_invoke_engine = new ActiveInvokeEngine();
+        g_active_invoke_engine->Start(env, package_name,
+                                       g_config.active_invoke_classes,
+                                       g_config.active_invoke_delay_ms,
+                                       g_config.active_invoke_max_methods);
+      }
+    }
   }
 }
 
