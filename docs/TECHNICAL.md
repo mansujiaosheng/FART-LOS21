@@ -558,6 +558,91 @@ offset +16: insns_[1]          (uint16_t[]) — 实际字节码
 - 复用已有过滤：Stage 2.2 已过滤 native/abstract/runtime
 - reentry guard 保护：不递归
 
+### 7a.10 Stage 2.4: 被动 CodeItem Dump
+
+#### 设计原则
+
+- **不主动调用**：只在 ArtMethod::Invoke 已自然触发的方法上 dump
+- **不修改 dex**：只读写入，不修复 CodeItem
+- **只 dump header + insns**：tries/catch handler 暂不处理
+- **安全优先**：sync memcpy 到 owned buffer，worker 线程只写 owned buffer
+
+#### 输出目录
+
+```
+/data/local/tmp/fart_dump/methods/
+├── method_index.csv                          # CSV 索引
+├── method_001234_a1b2c3d4.json               # metadata JSON
+└── method_001234_a1b2c3d4.code               # raw CodeItem (header + insns)
+```
+
+#### JSON 格式
+
+```json
+{
+  "pid": 12345,
+  "tid": 12345,
+  "method_idx": 1234,
+  "sha256_prefix": "a1b2c3d4e5f6...",
+  "registers_size": 4,
+  "ins_size": 2,
+  "outs_size": 1,
+  "tries_size": 0,
+  "insns_size": 12,
+  "dump_size": 40,
+  "dump_complete": true,
+  "source": "ArtMethodInvoke"
+}
+```
+
+#### dump_size 计算
+
+```
+dump_size = 16 + insns_size * 2
+           (header)  (bytecode)
+```
+
+- `tries_size == 0` → `dump_complete = true`
+- `tries_size > 0` → `dump_complete = false`（try/catch 未包含）
+
+#### 去重策略
+
+组合 key: `sha256_prefix(8 hex) + ":" + method_idx` → 存 `unordered_set`
+
+同一方法（相同 dex + 相同 idx + 相同 insns hash）只写一次。
+
+#### 安全读取流程
+
+```
+Hook 线程 (ArtMethodInvokeHook):
+  IsRangeReadable(code_item_ptr, dump_size)                 ← 已有
+  → CodeItemDumpTask::CopyData(src, dump_size):             ← 新增
+      new uint8_t[dump_size] + memcpy (owned buffer)
+      → Compute SHA256 of owned buffer
+      → Generate sha256_prefix for dedup
+  → QueueDump(task):                                        ← 新增
+      dedup check
+      max limit check (max_codeitem_dumps)
+      push to worker queue
+
+Worker 线程:
+  pop queue
+  → WriteJsonFile()     → method_<idx>_<hash>.json
+  → WriteCodeFile()     → method_<idx>_<hash>.code
+  → AppendCsv()         → method_index.csv
+```
+
+#### 配置项
+
+```json
+{
+    "enable_codeitem_dump": false,
+    "max_codeitem_dumps": 500
+}
+```
+
+默认全部关闭，需同时开启 `enable_artmethod_hook=true` + `enable_codeitem_dump=true` 才生效。
+
 ---
 
 ## 8. DefineClass 函数地址解析
