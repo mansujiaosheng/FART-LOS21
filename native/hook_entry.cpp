@@ -173,7 +173,18 @@ void ArtMethodInvokeHook(void* art_method, void* thread, void* args,
   }
   g_fart_in_invoke = true;
 
-  // Nothing else in Stage 2.0 — just call the original
+  // Stage 2.1: Sampling log (only when hook is active)
+  if (g_artmethod_hook_active.load()) {
+    static thread_local uint64_t g_invoke_count = 0;
+    g_invoke_count++;
+
+    uint32_t rate = g_config.artmethod_sample_rate;
+    if (rate == 0) rate = 1000;
+    if (g_invoke_count % rate == 1) {
+      LOGI("Invoke #%lu: method=%p tid=%d",
+           g_invoke_count, art_method, (int)syscall(__NR_gettid));
+    }
+  }
 
 call_original:
   if (g_artmethod_invoke_orig) {
