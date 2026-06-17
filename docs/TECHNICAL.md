@@ -501,6 +501,63 @@ if (flags & 0x0400) return;  // kAccAbstract
 }
 ```
 
+### 7a.9 Stage 2.3: CodeItem Metadata 定位
+
+#### 访问路径
+
+从 `art/runtime/art_method-inl.h:457-467` 确认，运行时 `ArtMethod` 的 `ptr_sized_fields_.data_`（offset 0x10）**直接是 CodeItem* 指针**，不需经过 `GetDexFile()` 或 `GetDexCache()`。
+
+```cpp
+inline const dex::CodeItem* ArtMethod::GetCodeItem() {
+  if (!HasCodeItem()) return nullptr;            // 已由 Stage 2.2 过滤
+  // AOT compiler: data_ 是文件偏移
+  // Runtime: data_ 是直接 CodeItem* 指针, bit0 可能为标记
+  return runtime->IsAotCompiler()
+      ? GetDexFile()->GetCodeItem((uint32_t)GetDataPtrSize(pointer_size))
+      : (const dex::CodeItem*)((uintptr_t)GetDataPtrSize(pointer_size) & ~1);
+}
+```
+
+#### 读取流程
+
+```cpp
+// 1. 从 ArtMethod+0x10 读 data_ pointer
+uintptr_t data_ptr = *(const uintptr_t*)(m + 0x10);
+// 2. 清除 bit0 标记（运行时标记）
+const uint8_t* ci = (const uint8_t*)(data_ptr & ~1ULL);
+// 3. 验证可读 + 范围检查
+if (ci && IsRangeReadable(ci, 16)) {
+    uint32_t insns = *(const uint32_t*)(ci + 12);
+    if (insns > 0 && insns < 65536) {
+        uint16_t regs  = *(const uint16_t*)(ci + 0);
+        uint16_t ins   = *(const uint16_t*)(ci + 2);
+        uint16_t outs  = *(const uint16_t*)(ci + 4);
+        uint16_t tries = *(const uint16_t*)(ci + 6);
+        // 输出 metadata（不写文件）
+        LOGI("CodeItem: regs=%u ins=%u outs=%u tries=%u insns=%u", ...);
+    }
+}
+```
+
+#### CodeItem 结构（StandardDexFile）
+
+```
+offset  +0: registers_size_    (uint16_t)  — 使用的寄存器总数
+offset  +2: ins_size_          (uint16_t)  — 输入参数字数
+offset  +4: outs_size_         (uint16_t)  — 传出参数空间
+offset  +6: tries_size_        (uint16_t)  — try_item 数量
+offset  +8: debug_info_off_    (uint32_t)  — debug info 偏移
+offset +12: insns_size_in_code_units_ (uint32_t) — 字节码大小(2字节单位)
+offset +16: insns_[1]          (uint16_t[]) — 实际字节码
+```
+
+#### 安全保证
+
+- 只读不写：不打文件，只打日志
+- 两级验证：`IsRangeReadable(ci, 16)` + `insns_size` 范围检查 0~65535
+- 复用已有过滤：Stage 2.2 已过滤 native/abstract/runtime
+- reentry guard 保护：不递归
+
 ---
 
 ## 8. DefineClass 函数地址解析
