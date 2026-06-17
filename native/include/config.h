@@ -14,6 +14,10 @@ struct Config {
   bool dump_code_item = false;
   bool active_invoke = false;
 
+  // Phase 2: ArtMethod::Invoke hook
+  bool enable_artmethod_hook = false;
+  uint32_t artmethod_sample_rate = 1000;
+
   bool IsAllowed(const char* package_name) const;
 };
 

@@ -9,5 +9,7 @@
   "dump_dir": "/data/local/tmp/fart",
   "dump_dex": true,
   "dump_code_item": false,
-  "active_invoke": false
+  "active_invoke": false,
+  "enable_artmethod_hook": false,
+  "artmethod_sample_rate": 1000
 }

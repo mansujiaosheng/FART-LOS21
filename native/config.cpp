@@ -4,6 +4,7 @@
 #include <fstream>
 #include <sstream>
 #include <cstring>
+#include <cstdlib>
 #include <android/log.h>
 
 #define LOG_TAG "FART_LOS21"
@@ -97,16 +98,36 @@ bool LoadConfig(Config* config, const char* path) {
     return !out->empty();
   };
 
+  // Parse uint32 values
+  auto find_uint = [&](const char* key, uint32_t* out) -> bool {
+    auto pos = content.find(key);
+    if (pos == std::string::npos) return false;
+    auto colon = content.find(':', pos);
+    if (colon == std::string::npos) return false;
+    auto val_start = content.find_first_not_of(" \t\r\n", colon + 1);
+    if (val_start == std::string::npos) return false;
+    char* end = nullptr;
+    // Build a C string from the content for strtoul
+    std::string num_str = content.substr(val_start);
+    unsigned long v = strtoul(num_str.c_str(), &end, 10);
+    if (end == num_str.c_str()) return false;
+    *out = (uint32_t)v;
+    return true;
+  };
+
   find_bool("\"enable\"", &config->enable);
   find_string("\"dump_dir\"", &config->dump_dir);
   find_bool("\"dump_dex\"", &config->dump_dex);
   find_bool("\"dump_code_item\"", &config->dump_code_item);
   find_bool("\"active_invoke\"", &config->active_invoke);
+  find_bool("\"enable_artmethod_hook\"", &config->enable_artmethod_hook);
+  find_uint("\"artmethod_sample_rate\"", &config->artmethod_sample_rate);
   find_packages(&config->packages);
 
-  LOGI("Config loaded: enable=%d, packages=%zu, dump_dex=%d, dump_code_item=%d, active_invoke=%d",
+  LOGI("Config loaded: enable=%d, packages=%zu, dump_dex=%d, dump_code_item=%d, active_invoke=%d, artmethod_hook=%d, sample_rate=%u",
        config->enable, config->packages.size(),
-       config->dump_dex, config->dump_code_item, config->active_invoke);
+       config->dump_dex, config->dump_code_item, config->active_invoke,
+       config->enable_artmethod_hook, config->artmethod_sample_rate);
 
   return true;
 }
