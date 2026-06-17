@@ -37,6 +37,9 @@ class ActiveInvokeEngine {
 
   // Invoke all static no-arg methods on a preloaded class
   void InvokeClassMethods(JNIEnv* env, jclass target_cls, const std::string& cls_name);
+
+  // Phase 1B: Try to start via Java Thread (no AttachCurrentThread needed)
+  bool TryStartJavaThread(JNIEnv* env);
 };
 
 }  // namespace fart

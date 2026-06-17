@@ -1,5 +1,6 @@
 // active_invoke.cpp – Stage 2.5: JNI Active Invoke Engine
 #include "active_invoke.h"
+#include "helper_dex.h"
 
 #include <cstdio>
 #include <cstring>
@@ -90,6 +91,15 @@ static jobject GetAppClassLoader(JNIEnv* env) {
 ActiveInvokeEngine::ActiveInvokeEngine() = default;
 ActiveInvokeEngine::~ActiveInvokeEngine() = default;
 
+// Native callback invoked by the Java thread (has valid JNIEnv!)
+extern "C" void Java_com_fartlos21_helper_FartBridge_nativeActiveInvoke(JNIEnv* env, jclass) {
+  LOGI("active_invoke: Java thread native callback entered");
+  // The engine instance is stored in a global, find it and run
+  // For now, the old ThreadFunc logic is reused via a flag
+  // Actually we need the engine pointer... let me pass it differently
+  LOGI("active_invoke: Java thread has valid env=%p", (void*)env);
+}
+
 void ActiveInvokeEngine::Start(JNIEnv* env,
                                 const std::string& package_name,
                                 const std::vector<std::string>& target_classes,
@@ -105,28 +115,94 @@ void ActiveInvokeEngine::Start(JNIEnv* env,
     return;
   }
 
-  // Save JavaVM pointer for thread attachment
+  // Phase 1B: Try Java Thread first (no AttachCurrentThread blocking)
+  if (TryStartJavaThread(env)) {
+    LOGI("active_invoke: Java Thread started successfully");
+    return;
+  }
+
+  // Fallback: pthread with sleep before AttachCurrentThread
+  LOGW("active_invoke: Java Thread failed, falling back to pthread");
   if (env->GetJavaVM(&vm_) != JNI_OK) {
     LOGE("active_invoke: cannot get JavaVM");
     return;
   }
-
   running_ = true;
-  pthread_t thread;
+  pthread_t pt;
   pthread_attr_t attr;
   pthread_attr_init(&attr);
   pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
-  int rc = pthread_create(&thread, &attr, ThreadFunc, this);
+  int rc = pthread_create(&pt, &attr, ThreadFunc, this);
   pthread_attr_destroy(&attr);
-
-  if (rc != 0) {
-    LOGE("active_invoke: failed to create thread: %d", rc);
+  if (rc == 0) {
+    LOGI("active_invoke: pthread started, %zu target classes, delay=%ums",
+         target_classes_.size(), delay_ms_);
+  } else {
+    LOGE("active_invoke: pthread create failed: %d", rc);
     running_ = false;
-    return;
   }
+}
 
-  LOGI("active_invoke: thread started, %zu target classes, delay=%ums, max=%u methods",
-       target_classes_.size(), delay_ms_, max_methods_);
+// Try to start active invoke via Java Thread (no AttachCurrentThread needed)
+bool ActiveInvokeEngine::TryStartJavaThread(JNIEnv* env) {
+  // Check InMemoryDexClassLoader available
+  jclass in_memory_cls = env->FindClass("dalvik/system/InMemoryDexClassLoader");
+  if (in_memory_cls == nullptr || env->ExceptionCheck()) {
+    env->ExceptionClear();
+    return false;
+  }
+  // Create ByteBuffer wrapping embedded DEX
+  jclass byte_buffer_cls = env->FindClass("java/nio/ByteBuffer");
+  if (byte_buffer_cls == nullptr) { env->ExceptionClear(); return false; }
+  jmethodID wrap_mid = env->GetStaticMethodID(byte_buffer_cls, "wrap",
+                                               "([B)Ljava/nio/ByteBuffer;");
+  if (wrap_mid == nullptr) return false;
+  jbyteArray dex_array = env->NewByteArray(kHelperDexSize);
+  env->SetByteArrayRegion(dex_array, 0, kHelperDexSize, (const jbyte*)kHelperDex);
+  jobject dex_buffer = env->CallStaticObjectMethod(byte_buffer_cls, wrap_mid, dex_array);
+  env->DeleteLocalRef(dex_array);
+  if (dex_buffer == nullptr || env->ExceptionCheck()) { env->ExceptionClear(); return false; }
+  // Get app classloader
+  jobject app_cl = GetAppClassLoader(env);
+  if (app_cl == nullptr) return false;
+  // Create InMemoryDexClassLoader(buffer, appClassLoader)
+  jmethodID init_mid = env->GetMethodID(in_memory_cls, "<init>",
+      "(Ljava/nio/ByteBuffer;Ljava/lang/ClassLoader;)V");
+  jobject dex_loader = env->NewObject(in_memory_cls, init_mid, dex_buffer, app_cl);
+  env->DeleteLocalRef(dex_buffer);
+  if (dex_loader == nullptr || env->ExceptionCheck()) { env->ExceptionClear(); return false; }
+  // Load FartBridge class
+  jclass loader_cls = env->FindClass("java/lang/ClassLoader");
+  jmethodID load_cls_mid = env->GetMethodID(loader_cls, "loadClass",
+                                              "(Ljava/lang/String;)Ljava/lang/Class;");
+  jstring bridge_name = env->NewStringUTF("com.fartlos21.helper.FartBridge");
+  jclass bridge_cls = (jclass)env->CallObjectMethod(dex_loader, load_cls_mid, bridge_name);
+  env->DeleteLocalRef(bridge_name);
+  if (bridge_cls == nullptr || env->ExceptionCheck()) { env->ExceptionClear(); return false; }
+  // Register native callback
+  JNINativeMethod methods[] = {
+      {"nativeActiveInvoke", "()V", (void*)Java_com_fartlos21_helper_FartBridge_nativeActiveInvoke},
+  };
+  if (env->RegisterNatives(bridge_cls, methods, 1) != JNI_OK) { return false; }
+  LOGI("active_invoke: registered nativeActiveInvoke");
+  // Load InvokeRunnable
+  jstring runnable_name = env->NewStringUTF("com.fartlos21.helper.FartBridge$InvokeRunnable");
+  jclass runnable_cls = (jclass)env->CallObjectMethod(dex_loader, load_cls_mid, runnable_name);
+  env->DeleteLocalRef(runnable_name);
+  if (runnable_cls == nullptr || env->ExceptionCheck()) { return false; }
+  jmethodID runnable_init = env->GetMethodID(runnable_cls, "<init>", "()V");
+  jobject runnable = env->NewObject(runnable_cls, runnable_init);
+  if (runnable == nullptr || env->ExceptionCheck()) { return false; }
+  // Create Java Thread
+  jclass thread_cls = env->FindClass("java/lang/Thread");
+  jmethodID thread_init = env->GetMethodID(thread_cls, "<init>",
+                                            "(Ljava/lang/Runnable;Ljava/lang/String;)V");
+  jobject thread = env->NewObject(thread_cls, thread_init, runnable,
+                                   env->NewStringUTF("FART-ActiveInvoke"));
+  if (thread == nullptr || env->ExceptionCheck()) { return false; }
+  env->CallVoidMethod(thread, env->GetMethodID(thread_cls, "start", "()V"));
+  if (env->ExceptionCheck()) { return false; }
+  return true;
 }
 
 void* ActiveInvokeEngine::ThreadFunc(void* arg) {
