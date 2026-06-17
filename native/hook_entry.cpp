@@ -17,6 +17,8 @@
 #include <sys/syscall.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <mutex>
+#include <unordered_set>
 #include <android/log.h>
 #include <jni.h>
 
@@ -32,6 +34,10 @@ static char g_package[256] = {};
 
 // Stage 2.5: Active invoke flag - must be OUTSIDE anonymous namespace
 __attribute__((visibility("default"))) volatile int g_active_invoke_running = 0;
+
+// Dedup set for DefineClass dump: track dex begin_ addresses already dumped
+static std::unordered_set<uintptr_t> g_dumped_dex_set;
+static std::mutex g_dumped_dex_mutex;
 
 namespace {
 
@@ -135,6 +141,16 @@ void* DefineClassHook(void* class_linker, void* thread, const char* descriptor,
   if (!IsRangeReadable(begin, dex_size)) { LOGW("data not fully readable"); return result; }
 
   LOGI("Dex: begin=%p size=%u", begin, dex_size);
+
+  // Dedup: skip if this dex begin_ address was already dumped
+  {
+    uintptr_t begin_key = (uintptr_t)begin;
+    std::lock_guard<std::mutex> lock(g_dumped_dex_mutex);
+    if (g_dumped_dex_set.find(begin_key) != g_dumped_dex_set.end()) {
+      return result;  // Already dumped this dex
+    }
+    g_dumped_dex_set.insert(begin_key);
+  }
 
   // Deep copy and write synchronously
   pid_t pid = getpid();
