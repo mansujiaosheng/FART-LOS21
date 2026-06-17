@@ -183,6 +183,35 @@ void ArtMethodInvokeHook(void* art_method, void* thread, void* args,
     if (g_invoke_count % rate == 1) {
       LOGI("Invoke #%lu: method=%p tid=%d",
            g_invoke_count, art_method, (int)syscall(__NR_gettid));
+
+      // Stage 2.2: Parse ArtMethod fields
+      uintptr_t m = (uintptr_t)art_method & 0x00FFFFFFFFFFFFFFULL;
+      if (m != 0 && IsRangeReadable((void*)m, 0x20)) {
+        // ArtMethod field offsets (Android 14 / LOS21, ARM64):
+        //   0x00: declaring_class_ (GcRoot<Class>, 4 bytes compressed ref)
+        //   0x04: access_flags_ (std::atomic<uint32_t>, 4 bytes)
+        //   0x08: dex_method_index_ (uint32_t, 4 bytes)
+        //   0x0C: method_index_ (uint16_t, 2 bytes)
+        //   0x0E: hotness_count_ (uint16_t, 2 bytes)
+        //   0x10: ptr_sized_fields_.data_ (void*, 8 bytes)
+        //   0x18: entry_point_from_quick_compiled_code_ (void*, 8 bytes)
+
+        uint32_t class_ref = *(const uint32_t*)(m + 0x00);
+        uint32_t access_flags = *(const uint32_t*)(m + 0x04);
+        uint32_t dex_idx = *(const uint32_t*)(m + 0x08);
+
+        // Filter: skip uninitialized, runtime methods, native, abstract
+        bool skip = false;
+        if (class_ref == 0) skip = true;
+        if (dex_idx == 0xFFFFFFFF) skip = true;  // kRuntimeMethodDexMethodIndex
+        if (access_flags & 0x0100) skip = true;  // kAccNative
+        if (access_flags & 0x0400) skip = true;  // kAccAbstract
+
+        if (!skip) {
+          LOGI("Method: class_ref=0x%x dex_idx=%u flags=0x%x",
+               class_ref, dex_idx, access_flags);
+        }
+      }
     }
   }
 
