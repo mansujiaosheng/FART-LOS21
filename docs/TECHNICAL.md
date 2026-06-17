@@ -7,7 +7,8 @@
 ### 核心功能
 
 - 在目标 app 启动时，通过 ZygiskNext 注入到 app 进程
-- Hook ART 的 `ClassLinker::DefineClass` 函数
+- Hook ART 的 `ClassLinker::DefineClass` 函数 (被动 DexFile dump)
+- 可选 Hook ART 的 `ArtMethod::Invoke` 函数 (反射/JNI 方法调用入口)
 - 在类加载时提取 DexFile 的原始字节并写入磁盘
 - 支持 allowlist / blacklist 包名过滤
 - 支持禁用模块后恢复系统原状
@@ -27,13 +28,17 @@ dlopen libfart-hook.so
   ↓
 fart_on_app_specialize(JNIEnv*, package_name, module_dir)
   ↓
-SetupHooks(): resolve DefineClass → Arm64InlineHook
+SetupHooks():
+  ├── resolve DefineClass → Arm64InlineHook (DefineClassHook)
+  └── [条件] resolve ArtMethod::Invoke → Arm64InlineHook (ArtMethodInvokeHook)
   ↓
 DumpAlreadyLoadedDex(): Java反射枚举 DexFile
   ↓
 DefineClassHook 回调: DexFile+8 读取 begin_ → IsRangeReadable 验证
   ↓
 同步写文件 → /data/local/tmp/fart_dump/dex_*.dex
+  ↓
+[条件] ArtMethodInvokeHook 回调: 采样日志 + 字段解析
 ```
 
 ---
@@ -351,6 +356,150 @@ class DexFile {
 
 `begin_` 指向 dex 文件在内存中的起始地址，即 `dex\n035`/`dex\n039` magic 的位置。
 `header_->file_size_` (at `begin + 0x20`) 包含完整 dex 文件大小。
+
+---
+
+## 7a. Phase 2: ArtMethod::Invoke Hook
+
+### 7a.1 设计动机
+
+`ArtMethod::Invoke` 是 ART 中 Java 方法调用的 C++ 入口函数。虽然普通 Java 编译代码通过 `art_quick_invoke_stub` 直接执行绕过此函数，但**反射调用**（`Method.invoke()`）、**JNI 调用**和**解释执行**的场景仍会经过 `ArtMethod::Invoke`。Hook 此函数可以捕获：
+
+- 反射执行的脱壳方法
+- JNI 回调的 Java 方法
+- 解释器模式下的方法执行
+- 后续可以扩展为 CodeItem dump 和主动调用
+
+### 7a.2 符号与偏移
+
+```cpp
+// 完整 mangled 符号
+_ZN3art9ArtMethod6InvokeEPNS_6ThreadEPjjPNS_6JValueEPKc
+
+// C++ 签名
+void ArtMethod::Invoke(Thread* self, uint32_t* args, uint32_t args_size,
+                       JValue* result, const char* shorty);
+```
+
+从设备 `libart.so` 分析确认偏移：
+
+```bash
+readelf -Ws libart_device.so | grep ArtMethod6Invoke
+# ➜ 0x340da0  536  FUNC  _ZN3art9ArtMethod6Invoke...
+```
+
+解析顺序：`ResolveByOffset(0x340da0)` → `ResolveByName(mangled)`。
+
+### 7a.3 ArtMethod 结构体布局 (Android 14 / LineageOS 21, ARM64)
+
+从 `art/runtime/art_method.h` 源码确认的字段偏移：
+
+```cpp
+class ArtMethod {
+    // offset 0x00: GcRoot<mirror::Class> declaring_class_   (4 bytes compressed ref)
+    // offset 0x04: std::atomic<uint32_t> access_flags_       (4 bytes)
+    // offset 0x08: uint32_t dex_method_index_                 (4 bytes)
+    // offset 0x0C: uint16_t method_index_                     (2 bytes)
+    // offset 0x0E: uint16_t hotness_count_                    (2 bytes)
+    // ---- align to 8 bytes ----
+    // offset 0x10: void* ptr_sized_fields_.data_              (8 bytes)
+    // offset 0x18: void* entry_point_from_quick_compiled_code_ (8 bytes)
+};
+// total: 0x20 = 32 bytes
+```
+
+### 7a.4 Hook 回调实现
+
+```cpp
+extern "C" void ArtMethodInvokeHook(
+    void* art_method,  // X0 = this (ArtMethod*)
+    void* thread,      // X1 = Thread*
+    void* args,        // X2 = uint32_t*
+    void* args_size,   // X3 = uint32_t (value)
+    void* result,      // X4 = JValue*
+    void* shorty)      // X5 = const char*
+{
+    // Reentry guard (thread_local)
+    if (g_fart_in_invoke) goto call_original;
+    g_fart_in_invoke = true;
+
+    // Stage 2.1: Sampling log
+    static thread_local uint64_t g_invoke_count = 0;
+    g_invoke_count++;
+    if (g_invoke_count % g_config.artmethod_sample_rate == 1) {
+        LOGI("Invoke #%lu: method=%p tid=%d", ...);
+    }
+
+    // Stage 2.2: Field parsing
+    uintptr_t m = (uintptr_t)art_method & 0x00FFFFFFFFFFFFFFULL;
+    if (IsRangeReadable(m, 0x20)) {
+        uint32_t class_ref = *(uint32_t*)(m + 0x00);
+        uint32_t access_flags = *(uint32_t*)(m + 0x04);
+        uint32_t dex_idx = *(uint32_t*)(m + 0x08);
+        // Filter: skip native(0x0100), abstract(0x0400), runtime(0xFFFFFFFF)
+        if (!skip) LOGI("Method: class_ref=0x%x dex_idx=%u flags=0x%x", ...);
+    }
+
+call_original:
+    // Call original Invoke via trampoline
+    orig(art_method, thread, args, args_size_val, result, shorty);
+    g_fart_in_invoke = false;
+}
+```
+
+### 7a.5 关键设计
+
+| 设计点 | 说明 |
+|--------|------|
+| **reentry guard** | `thread_local bool` 防止递归（LOGI → android_log_print → ... 可能绕回 Invoke） |
+| **采样率** | `artmethod_sample_rate` 控制日志频率，默认 1000。Invoke 是高频函数，不采样会瞬间刷屏 |
+| **TBI 清除** | ARM64 Top Byte Ignore 标签与 DefineClass 处理一致 |
+| **字段过滤** | `kRuntimeMethodDexMethodIndex(0xFFFFFFFF)`、`kAccNative(0x0100)`、`kAccAbstract(0x0400)` 跳过 |
+| **Crash 保护** | SIGSEGV 时同时 Unhook DefineClass + ArtMethod 两个 hook |
+| **默认关闭** | `enable_artmethod_hook=false` 不影响现有 DefineClass dump |
+
+### 7a.6 入口指令检查
+
+从设备 `libart.so` 在 offset `0x340da0` 处的 16 字节：
+
+```asm
+SUB SP, SP, #0x20       ; 分配 32 字节栈帧
+STP x29, x30, [SP, #0x40]  ; 保存 FP/LR
+STP x24, x23, [SP, #0x50]  ; 保存被调用者保存寄存器
+STP x22, x21, [SP, #0x60]  ; 保存被调用者保存寄存器
+```
+
+前 4 条指令均为栈帧操作，**无 PC-relative 指令**，inline hook 的 trampoline 复制执行安全。
+
+### 7a.7 内存安全验证路径
+
+```cpp
+// ArtMethod pointer check
+uintptr_t m = (uintptr_t)art_method & 0x00FFFFFFFFFFFFFFULL;
+if (m == 0 || !IsRangeReadable((void*)m, 0x20)) return;
+
+// declaring_class_ at +0x00, 4 bytes compressed ref
+uint32_t class_ref = *(const uint32_t*)(m + 0x00);
+if (class_ref == 0) return;  // uninitialized
+
+// dex_method_index_ at +0x08
+uint32_t dex_idx = *(const uint32_t*)(m + 0x08);
+if (dex_idx == 0xFFFFFFFF) return;  // runtime method
+
+// access_flags_ at +0x04
+uint32_t flags = *(const uint32_t*)(m + 0x04);
+if (flags & 0x0100) return;  // kAccNative
+if (flags & 0x0400) return;  // kAccAbstract
+```
+
+### 7a.8 配置项
+
+```json
+{
+    "enable_artmethod_hook": false,
+    "artmethod_sample_rate": 1000
+}
+```
 
 ---
 
@@ -821,3 +970,7 @@ $ADB logcat | grep 'Found DefineClass'
 | 5 | 启动测试 app 后在输出目录生成 dex | ✅ 6 个 dex |
 | 6 | dex 文件 jadx 能打开 | ✅ dex\n035 + dex\n039 |
 | 7 | 删除模块或关配置后系统恢复正常 | ✅ |
+| 8 | Phase 2: ArtMethod::Invoke Hook 安装 + 默认关闭不影响 DefineClass | ✅ |
+| 9 | Phase 2: enable_artmethod_hook=true 后 Hook 安装成功、app 不崩溃 | ✅ |
+| 10 | Phase 2: 字段解析 (class_ref + dex_idx + flags) + 过滤 native/abstract/runtime | ✅ |
+| 11 | Phase 2: 4 个 Git 分支已推送到 GitHub | ✅ |
