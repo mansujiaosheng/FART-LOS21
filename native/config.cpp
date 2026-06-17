@@ -128,6 +128,7 @@ bool LoadConfig(Config* config, const char* path) {
   find_uint("\"active_invoke_delay_ms\"", &config->active_invoke_delay_ms);
   find_uint("\"active_invoke_max_classes\"", &config->active_invoke_max_classes);
   find_uint("\"active_invoke_max_methods\"", &config->active_invoke_max_methods);
+  find_bool("\"active_invoke_skip_execute\"", &config->active_invoke_skip_execute);
   // active_invoke_classes array (reuse existing packages parsing)
   {
     auto pos = content.find("\"active_invoke_classes\"");
@@ -155,7 +156,7 @@ bool LoadConfig(Config* config, const char* path) {
   }
   find_packages(&config->packages);
 
-  LOGI("Config loaded: enable=%d, packages=%zu, dump_dex=%d, dump_code_item=%d, active_invoke=%d, artmethod_hook=%d, sample_rate=%u, codeitem_dump=%d, max_dumps=%u, active_invoke=%d, classes=%zu",
+  LOGI("Config loaded: enable=%d, packages=%zu, dump_dex=%d, dump_code_item=%d, active_invoke=%d, artmethod_hook=%d, sample_rate=%u, codeitem_dump=%d, max_dumps=%u, active_invoke=%d, skip_exec=%d, classes=%zu",
        config->enable, config->packages.size(),
        config->dump_dex, config->dump_code_item, config->active_invoke,
        config->enable_artmethod_hook, config->artmethod_sample_rate,

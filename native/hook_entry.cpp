@@ -297,6 +297,28 @@ void ArtMethodInvokeHook(void* art_method, void* thread, void* args,
     }
   }
 
+  // Phase 2: Skip execute for active invoke (just dump, don't run)
+  if (g_active_invoke_running && g_config.active_invoke_skip_execute && shorty != nullptr) {
+    const char* st = (const char*)shorty;
+    jvalue* jv = (jvalue*)result;
+    if (jv != nullptr && st[0] != '\0') {
+      switch (st[0]) {
+        case 'V': break;                                   // void
+        case 'Z': jv->z = 0; break;
+        case 'B': jv->b = 0; break;
+        case 'S': jv->s = 0; break;
+        case 'C': jv->c = 0; break;
+        case 'I': jv->i = 0; break;
+        case 'J': jv->j = 0; break;
+        case 'F': jv->f = 0.0f; break;
+        case 'D': jv->d = 0.0; break;
+        default: jv->l = nullptr; break;  // 'L' object or '[' array
+      }
+    }
+    g_fart_in_invoke = false;
+    return;  // Skip original function!
+  }
+
 call_original:
   if (g_artmethod_invoke_orig) {
     auto orig = reinterpret_cast<void (*)(void*, void*, void*, void*, void*, void*)>(

@@ -27,6 +27,7 @@ struct Config {
   uint32_t active_invoke_delay_ms = 1500;
   uint32_t active_invoke_max_classes = 50;
   uint32_t active_invoke_max_methods = 200;
+  bool active_invoke_skip_execute = true;
   std::vector<std::string> active_invoke_classes;
 
   bool IsAllowed(const char* package_name) const;

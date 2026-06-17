@@ -18,5 +18,6 @@
   "active_invoke_delay_ms": 1500,
   "active_invoke_max_classes": 50,
   "active_invoke_max_methods": 200,
+  "active_invoke_skip_execute": true,
   "active_invoke_classes": []
 }
