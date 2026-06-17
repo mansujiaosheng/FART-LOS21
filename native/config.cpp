@@ -122,12 +122,15 @@ bool LoadConfig(Config* config, const char* path) {
   find_bool("\"active_invoke\"", &config->active_invoke);
   find_bool("\"enable_artmethod_hook\"", &config->enable_artmethod_hook);
   find_uint("\"artmethod_sample_rate\"", &config->artmethod_sample_rate);
+  find_bool("\"enable_codeitem_dump\"", &config->enable_codeitem_dump);
+  find_uint("\"max_codeitem_dumps\"", &config->max_codeitem_dumps);
   find_packages(&config->packages);
 
-  LOGI("Config loaded: enable=%d, packages=%zu, dump_dex=%d, dump_code_item=%d, active_invoke=%d, artmethod_hook=%d, sample_rate=%u",
+  LOGI("Config loaded: enable=%d, packages=%zu, dump_dex=%d, dump_code_item=%d, active_invoke=%d, artmethod_hook=%d, sample_rate=%u, codeitem_dump=%d, max_dumps=%u",
        config->enable, config->packages.size(),
        config->dump_dex, config->dump_code_item, config->active_invoke,
-       config->enable_artmethod_hook, config->artmethod_sample_rate);
+       config->enable_artmethod_hook, config->artmethod_sample_rate,
+       config->enable_codeitem_dump, config->max_codeitem_dumps);
 
   return true;
 }

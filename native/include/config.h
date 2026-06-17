@@ -18,6 +18,10 @@ struct Config {
   bool enable_artmethod_hook = false;
   uint32_t artmethod_sample_rate = 1000;
 
+  // Stage 2.4: CodeItem dump
+  bool enable_codeitem_dump = false;
+  uint32_t max_codeitem_dumps = 500;
+
   bool IsAllowed(const char* package_name) const;
 };
 

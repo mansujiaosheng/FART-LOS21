@@ -5,6 +5,7 @@
 #include "art_resolver.h"
 #include "dex_dump.h"
 #include "arm64_hook.h"
+#include "codeitem_dump.h"
 
 #include <cstdio>
 #include <cstring>
@@ -44,6 +45,9 @@ static Arm64InlineHook* g_define_hook = nullptr;
 static Arm64InlineHook* g_artmethod_hook = nullptr;
 static void* g_artmethod_invoke_orig = nullptr;
 static std::atomic<bool> g_artmethod_hook_active{false};
+
+// Stage 2.4: CodeItem dump worker
+static CodeItemDumper* g_codeitem_dumper = nullptr;
 
 // Crash handlers
 static struct sigaction old_sigsegv;
@@ -225,6 +229,39 @@ void ArtMethodInvokeHook(void* art_method, void* thread, void* args,
             if (insns > 0 && insns < 65536) {
               LOGI("CodeItem: regs=%u ins=%u outs=%u tries=%u insns=%u ptr=%p",
                    regs, ins, outs, tries, insns, ci);
+
+              // Stage 2.4: Passive CodeItem dump (header + insns only)
+              if (g_config.enable_codeitem_dump && g_codeitem_dumper != nullptr) {
+                CodeItemDumpTask citask;
+                citask.pid = getpid();
+                citask.tid = (pid_t)syscall(__NR_gettid);
+                citask.method_idx = dex_idx;
+                citask.registers_size = regs;
+                citask.ins_size = ins;
+                citask.outs_size = outs;
+                citask.tries_size = tries;
+                citask.insns_size = insns;
+                citask.dump_size = 16 + (size_t)insns * 2;
+                citask.dump_complete = (tries == 0);  // true only if no try/catch blocks
+
+                // Sync memcpy to owned buffer (safe copy)
+                if (citask.CopyData(ci, citask.dump_size)) {
+                  int rc = g_codeitem_dumper->QueueDump(citask);
+                  if (rc == 0) {
+                    LOGI("codeitem_dump: queued method_%u (%zu bytes, %s)",
+                         dex_idx, citask.dump_size,
+                         citask.dump_complete ? "complete" : "partial");
+                  } else if (rc == 1) {
+                    LOGI("codeitem_dump: duplicate method_%u", dex_idx);
+                  } else if (rc == 2) {
+                    LOGW("codeitem_dump: max reached, skip method_%u", dex_idx);
+                  } else {
+                    LOGW("codeitem_dump: queue failed for method_%u", dex_idx);
+                  }
+                } else {
+                  LOGW("codeitem_dump: CopyData failed for method_%u", dex_idx);
+                }
+              }
             } else {
               LOGI("CodeItem: invalid insns=%u (data_ptr=0x%zx)", insns, data_ptr);
             }
@@ -456,6 +493,19 @@ static bool SetupHooks() {
   LOGI("FART hooks: DefineClass=%s, ArtMethod::Invoke=%s",
        g_hooks_active.load() ? "active" : "off",
        g_artmethod_hook_active.load() ? "active" : "off");
+
+  // Stage 2.4: Init CodeItem dumper (only when enabled)
+  if (g_config.enable_codeitem_dump && g_config.enable_artmethod_hook) {
+    std::string codeitem_dir = g_config.dump_dir + "_dump";
+    g_codeitem_dumper = new CodeItemDumper();
+    if (!g_codeitem_dumper->Init(codeitem_dir.c_str(), g_config.max_codeitem_dumps)) {
+      LOGE("CodeItemDumper init failed");
+      delete g_codeitem_dumper;
+      g_codeitem_dumper = nullptr;
+    } else {
+      LOGI("✅ CodeItem dumper ready (max=%u)", g_config.max_codeitem_dumps);
+    }
+  }
 
   return true;
 }
