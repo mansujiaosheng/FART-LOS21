@@ -1,0 +1,13 @@
+{
+  "enable": true,
+  "packages": [
+    "infosecadventures.allsafe",
+    "com.funshion.video.mobile",
+    "com.example.farttest"
+  ],
+  "blacklist_packages": [],
+  "dump_dir": "/data/local/tmp/fart",
+  "dump_dex": true,
+  "dump_code_item": false,
+  "active_invoke": false
+}

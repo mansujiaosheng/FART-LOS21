@@ -1,0 +1,1677 @@
+{
+  "libart_path": "/lina_android/fart-los21/libart_device.so",
+  "libart_size": 10970672,
+  "total_dynamic_symbols": 1882,
+  "useful_symbols": [
+    {
+      "offset": "0x613990",
+      "size": 9784,
+      "name": "_ZN3art11ClassLinker29FindClassInBaseDexClassLoaderEPNS_6ThreadEPKcmNS_6HandleINS_6mirror11ClassLoaderEEEPNS_6ObjPtrINS6_5ClassEEE"
+    },
+    {
+      "offset": "0x56cda0",
+      "size": 1044,
+      "name": "_ZNK3art8verifier12VerifierDeps6EncodeERKNSt3__16vectorIPKNS_7DexFileENS2_9allocatorIS6_EEEEPNS3_IhNS7_IhEEEE"
+    },
+    {
+      "offset": "0x7a5b00",
+      "size": 328,
+      "name": "_ZN3art11ClassLinker17OpenImageDexFilesEPNS_2gc5space10ImageSpaceEPNSt3__16vectorINS5_10unique_ptrIKNS_7DexFileENS5_14default_deleteIS9_EEEENS5_9allocatorISC_EEEEPNS5_12basic_stringIcNS5_11char_traitsIcEENSD_IcEEEE"
+    },
+    {
+      "offset": "0x7b14a0",
+      "size": 52,
+      "name": "_ZN3art11ClassLinker19GetClassesLockOwnerEv"
+    },
+    {
+      "offset": "0x8b8200",
+      "size": 8,
+      "name": "_ZN3art6mirror8ClassExt21SetPreRedefineDexFileEPKNS_7DexFileE"
+    },
+    {
+      "offset": "0x2cc440",
+      "size": 14948,
+      "name": "_ZN3art11ClassLinker10SetupClassERKNS_7DexFileERKNS_3dex8ClassDefENS_6HandleINS_6mirror5ClassEEENS_6ObjPtrINS9_11ClassLoaderEEE"
+    },
+    {
+      "offset": "0x8b8210",
+      "size": 48,
+      "name": "_ZN3art6mirror8DexCache10InitializeEPKNS_7DexFileENS_6ObjPtrINS0_11ClassLoaderEEE"
+    },
+    {
+      "offset": "0x2cb520",
+      "size": 3700,
+      "name": "_ZN3art11ClassLinker11InsertClassEPKcNS_6ObjPtrINS_6mirror5ClassEEEm"
+    },
+    {
+      "offset": "0x8e3890",
+      "size": 12,
+      "name": "_ZNK3art10OatDexFile8FileSizeEv"
+    },
+    {
+      "offset": "0x45a930",
+      "size": 368,
+      "name": "_ZN3art11ClassLinker24PerformClassVerificationEPNS_6ThreadEPNS_8verifier12VerifierDepsENS_6HandleINS_6mirror5ClassEEENS3_15HardFailLogModeEPNSt3__112basic_stringIcNSB_11char_traitsIcEENSB_9allocatorIcEEEE"
+    },
+    {
+      "offset": "0x90e4e0",
+      "size": 1248,
+      "name": "_ZN3art7Runtime21AppendToBootClassPathERKNSt3__112basic_stringIcNS1_11char_traitsIcEENS1_9allocatorIcEEEES9_RKNS1_6vectorINS1_10unique_ptrIKNS_7DexFileENS1_14default_deleteISD_EEEENS5_ISG_EEEE"
+    },
+    {
+      "offset": "0x8e26d0",
+      "size": 184,
+      "name": "_ZN3art9OatHeader33SetQuickToInterpreterBridgeOffsetEj"
+    },
+    {
+      "offset": "0x458440",
+      "size": 344,
+      "name": "_ZN3art9ArtMethod11JniLongNameEv"
+    },
+    {
+      "offset": "0x4947b0",
+      "size": 236,
+      "name": "_ZN3art11ClassLinker27AllocStackTraceElementArrayEPNS_6ThreadEm"
+    },
+    {
+      "offset": "0x94e030",
+      "size": 1148,
+      "name": "_ZN3art8verifier12VerifierDeps9MergeWithENSt3__110unique_ptrIS1_NS2_14default_deleteIS1_EEEERKNS2_6vectorIPKNS_7DexFileENS2_9allocatorISA_EEEE"
+    },
+    {
+      "offset": "0x2ec590",
+      "size": 9228,
+      "name": "_ZN3art11ClassLinker16LinkFieldsHelper10LinkFieldsEPS0_PNS_6ThreadENS_6HandleINS_6mirror5ClassEEEbPm"
+    },
+    {
+      "offset": "0x250fa0",
+      "size": 1168,
+      "name": "_ZN3art11ClassLinker13DoResolveTypeIPNS_8ArtFieldEEENS_6ObjPtrINS_6mirror5ClassEEENS_3dex9TypeIndexET_"
+    },
+    {
+      "offset": "0x3f58f0",
+      "size": 1976,
+      "name": "_ZN3art6mirror5Class15FindClassMethodENSt3__117basic_string_viewIcNS2_11char_traitsIcEEEES6_NS_11PointerSizeE"
+    },
+    {
+      "offset": "0x7b0580",
+      "size": 28,
+      "name": "_ZNK3art11ClassLinker26IsQuickToInterpreterBridgeEPKv"
+    },
+    {
+      "offset": "0x5dc210",
+      "size": 404,
+      "name": "_ZN3art2gc5space10ImageSpace25GetBootClassPathChecksumsENS_8ArrayRefIKPS2_EENS3_IKPKNS_7DexFileEEE"
+    },
+    {
+      "offset": "0x7a7420",
+      "size": 200,
+      "name": "_ZN3art11ClassLinker17IsSameClassLoaderENS_6ObjPtrINS_6mirror8DexCacheEEEPKNS0_12DexCacheDataENS1_INS2_11ClassLoaderEEE"
+    },
+    {
+      "offset": "0x80e440",
+      "size": 888,
+      "name": "_ZN3art15instrumentation15Instrumentation10DeoptimizeEPNS_9ArtMethodE"
+    },
+    {
+      "offset": "0x32b82c",
+      "size": 476,
+      "name": "_ZN3art38ThrowIncompatibleClassChangeErrorFieldEPNS_8ArtFieldEbPNS_9ArtMethodE"
+    },
+    {
+      "offset": "0x7a5ff0",
+      "size": 72,
+      "name": "_ZN3art11ClassLinker30InsertClassTableForClassLoaderENS_6ObjPtrINS_6mirror11ClassLoaderEEE"
+    },
+    {
+      "offset": "0xc30600",
+      "size": 8,
+      "name": "_ZN3art16WellKnownClasses53java_lang_invoke_MethodHandles_Lookup_findConstructorE"
+    },
+    {
+      "offset": "0x7a5710",
+      "size": 108,
+      "name": "_ZN3art11ClassLinker20AddExtraBootDexFilesEPNS_6ThreadEONSt3__16vectorINS3_10unique_ptrIKNS_7DexFileENS3_14default_deleteIS7_EEEENS3_9allocatorISA_EEEE"
+    },
+    {
+      "offset": "0x7aa050",
+      "size": 20,
+      "name": "_ZN3art11ClassLinker22CreateImtConflictTableEmPNS_11LinearAllocE"
+    },
+    {
+      "offset": "0x4fc210",
+      "size": 4,
+      "name": "_ZN3art3jni12JniIdManager14EncodeMethodIdENS_16ReflectiveHandleINS_9ArtMethodEEE"
+    },
+    {
+      "offset": "0x654f00",
+      "size": 76,
+      "name": "_ZN3art11ClassLinker11LookupClassEPNS_6ThreadEPKcNS_6ObjPtrINS_6mirror11ClassLoaderEEE"
+    },
+    {
+      "offset": "0x203940",
+      "size": 2020,
+      "name": "_ZN3art11ClassLinker12FindDexCacheEPNS_6ThreadERKNS_10OatDexFileE"
+    },
+    {
+      "offset": "0x7a9330",
+      "size": 1204,
+      "name": "_ZN3art11ClassLinker14LinkSuperClassENS_6HandleINS_6mirror5ClassEEE"
+    },
+    {
+      "offset": "0x32b678",
+      "size": 436,
+      "name": "_ZN3art33ThrowIllegalAccessErrorFinalFieldEPNS_9ArtMethodEPNS_8ArtFieldE"
+    },
+    {
+      "offset": "0x3ba4c0",
+      "size": 208,
+      "name": "_ZN3art9ArtMethod15NumArgRegistersENSt3__117basic_string_viewIcNS1_11char_traitsIcEEEE"
+    },
+    {
+      "offset": "0x7a8470",
+      "size": 140,
+      "name": "_ZN3art11ClassLinker33ResolveClassExceptionHandlerTypesENS_6HandleINS_6mirror5ClassEEE"
+    },
+    {
+      "offset": "0x825cc0",
+      "size": 64,
+      "name": "_ZN3art3jit3Jit13CompileMethodEPNS_9ArtMethodEPNS_6ThreadENS_15CompilationKindEb"
+    },
+    {
+      "offset": "0x42c6f0",
+      "size": 1368,
+      "name": "_ZN3art9ArtMethod23GetOatQuickMethodHeaderEm"
+    },
+    {
+      "offset": "0x6553b0",
+      "size": 156,
+      "name": "_ZN3art11ClassLinker17CreateProxyMethodENS_6HandleINS_6mirror5ClassEEEPNS_9ArtMethodES6_"
+    },
+    {
+      "offset": "0x7a6060",
+      "size": 504,
+      "name": "_ZN3art11ClassLinkerD2Ev"
+    },
+    {
+      "offset": "0x7b1770",
+      "size": 112,
+      "name": "_ZNK3art11ClassLinker26DenyAccessBasedOnPublicSdkEPNS_9ArtMethodE"
+    },
+    {
+      "offset": "0x8b81f0",
+      "size": 12,
+      "name": "_ZN3art6mirror8ClassExt27SetPreRedefineClassDefIndexEt"
+    },
+    {
+      "offset": "0x277e40",
+      "size": 1340,
+      "name": "_ZN3art11ClassLinker13DoResolveTypeENS_3dex9TypeIndexENS_6HandleINS_6mirror8DexCacheEEENS3_INS4_11ClassLoaderEEE"
+    },
+    {
+      "offset": "0x6191c0",
+      "size": 50300,
+      "name": "_ZNK3art10OatDexFile11GetOatClassEt"
+    },
+    {
+      "offset": "0x31e290",
+      "size": 224,
+      "name": "_ZN3art9ArtMethod23GetSingleImplementationENS_11PointerSizeE"
+    },
+    {
+      "offset": "0x4a08f0",
+      "size": 240,
+      "name": "_ZN3art9ArtMethod20GetRuntimeMethodNameEv"
+    },
+    {
+      "offset": "0x7a7d90",
+      "size": 672,
+      "name": "_ZN3art11ClassLinker13LookupClassesEPKcRNSt3__16vectorINS_6ObjPtrINS_6mirror5ClassEEENS3_9allocatorIS8_EEEE"
+    },
+    {
+      "offset": "0x570150",
+      "size": 20,
+      "name": "_ZN3art11ClassLinker31FindClassInSharedLibrariesAfterEPNS_6ThreadEPKcmNS_6HandleINS_6mirror11ClassLoaderEEEPNS_6ObjPtrINS6_5ClassEEE"
+    },
+    {
+      "offset": "0x656f20",
+      "size": 320,
+      "name": "_ZNK3art18ClassLoaderContext21FlattenOpenedDexFilesEv"
+    },
+    {
+      "offset": "0x2ff650",
+      "size": 520,
+      "name": "_ZN3art9ArtMethod8CopyFromEPS0_NS_11PointerSizeE"
+    },
+    {
+      "offset": "0x7a8030",
+      "size": 1080,
+      "name": "_ZN3art11ClassLinker23VerifyClassUsingOatFileEPNS_6ThreadERKNS_7DexFileENS_6HandleINS_6mirror5ClassEEERNS_11ClassStatusE"
+    },
+    {
+      "offset": "0x7af2e0",
+      "size": 152,
+      "name": "_ZN3art11ClassLinker19LookupResolvedFieldEjNS_6ObjPtrINS_6mirror8DexCacheEEENS1_INS2_11ClassLoaderEEEb"
+    },
+    {
+      "offset": "0x315f00",
+      "size": 364,
+      "name": "_ZN3art9ArtMethod18GetCanonicalMethodENS_11PointerSizeE"
+    },
+    {
+      "offset": "0x580b60",
+      "size": 264,
+      "name": "_ZN3art6Thread21SweepInterpreterCacheEPNS_15IsMarkedVisitorE"
+    },
+    {
+      "offset": "0x37cfd0",
+      "size": 1008,
+      "name": "_ZN3art6mirror5Class34FindVirtualMethodForInterfaceSuperEPNS_9ArtMethodENS_11PointerSizeE"
+    },
+    {
+      "offset": "0x94f9d0",
+      "size": 232,
+      "name": "_ZN3art8verifier12VerifierDeps9ClearDataERKNSt3__16vectorIPKNS_7DexFileENS2_9allocatorIS6_EEEE"
+    },
+    {
+      "offset": "0x6a4d00",
+      "size": 100,
+      "name": "_ZN3art10OatDexFileD1Ev"
+    },
+    {
+      "offset": "0x4e8b70",
+      "size": 708,
+      "name": "_ZN3art8VdexFile13OpenAtAddressEPhmbRKNSt3__112basic_stringIcNS2_11char_traitsIcEENS2_9allocatorIcEEEEbbPS8_"
+    },
+    {
+      "offset": "0x605100",
+      "size": 992,
+      "name": "_ZN3art9ArtMethod14FindCatchBlockENS_6HandleINS_6mirror5ClassEEEjPb"
+    },
+    {
+      "offset": "0x7b1850",
+      "size": 112,
+      "name": "_ZNK3art11ClassLinker26DenyAccessBasedOnPublicSdkEPKc"
+    },
+    {
+      "offset": "0x37c7d0",
+      "size": 292,
+      "name": "_ZN3art11ClassLinker34GetOrCreateAllocatorForClassLoaderENS_6ObjPtrINS_6mirror11ClassLoaderEEE"
+    },
+    {
+      "offset": "0x5c57d0",
+      "size": 472,
+      "name": "_ZN3art11ClassLinker22CreateProxyConstructorENS_6HandleINS_6mirror5ClassEEEPNS_9ArtMethodE"
+    },
+    {
+      "offset": "0x54df50",
+      "size": 120,
+      "name": "_ZN3art11ClassLinker20VisitClassesInternalEPNS_12ClassVisitorE"
+    },
+    {
+      "offset": "0x254ed0",
+      "size": 148,
+      "name": "_ZN3art6mirror5Class27FindTypeIndexInOtherDexFileERKNS_7DexFileE"
+    },
+    {
+      "offset": "0x655090",
+      "size": 800,
+      "name": "_ZN3art11ClassLinker28AttemptSupertypeVerificationEPNS_6ThreadEPNS_8verifier12VerifierDepsENS_6HandleINS_6mirror5ClassEEES9_"
+    },
+    {
+      "offset": "0x3913d0",
+      "size": 13860,
+      "name": "_ZN3art11ClassLinker9FindClassEPNS_6ThreadEPKcNS_6HandleINS_6mirror11ClassLoaderEEE"
+    },
+    {
+      "offset": "0x5a65a0",
+      "size": 784,
+      "name": "_ZN3art11ClassLinker35InitializeDefaultInterfaceRecursiveEPNS_6ThreadENS_6HandleINS_6mirror5ClassEEEbb"
+    },
+    {
+      "offset": "0x7afb60",
+      "size": 2048,
+      "name": "_ZN3art11ClassLinker28ResolveMethodHandleForMethodEPNS_6ThreadERKNS_3dex16MethodHandleItemEPNS_9ArtMethodE"
+    },
+    {
+      "offset": "0x7a9c70",
+      "size": 452,
+      "name": "_ZN3art11ClassLinker17VerifyRecordClassENS_6HandleINS_6mirror5ClassEEENS_6ObjPtrIS3_EE"
+    },
+    {
+      "offset": "0x7b1670",
+      "size": 248,
+      "name": "_ZN3art11ClassLinker29GetHoldingClassOfCopiedMethodEPNS_9ArtMethodE"
+    },
+    {
+      "offset": "0x90e9c0",
+      "size": 1248,
+      "name": "_ZN3art7Runtime21AppendToBootClassPathERKNSt3__112basic_stringIcNS1_11char_traitsIcEENS1_9allocatorIcEEEES9_RKNS1_6vectorIPKNS_7DexFileENS5_ISD_EEEE"
+    },
+    {
+      "offset": "0xc305e8",
+      "size": 8,
+      "name": "_ZN3art16WellKnownClasses41java_lang_invoke_MethodHandle_invokeExactE"
+    },
+    {
+      "offset": "0x5a5b90",
+      "size": 40,
+      "name": "_ZN3art11ClassLinker20DecodeDexCacheLockedEPNS_6ThreadEPKNS0_12DexCacheDataE"
+    },
+    {
+      "offset": "0x91dca0",
+      "size": 432,
+      "name": "_ZNK3art12StackVisitor11GetVRegPairEPNS_9ArtMethodEtNS_8VRegKindES3_Pm"
+    },
+    {
+      "offset": "0x458880",
+      "size": 540,
+      "name": "_ZN3art9ArtMethod12JniShortNameEv"
+    },
+    {
+      "offset": "0x7b1610",
+      "size": 92,
+      "name": "_ZNK3art11ClassLinker15VisitAllocatorsEPNS_16AllocatorVisitorE"
+    },
+    {
+      "offset": "0xa1a010",
+      "size": 32,
+      "name": "_ZTVN3art13DexFileLoaderE"
+    },
+    {
+      "offset": "0x92fd30",
+      "size": 148,
+      "name": "_ZNK3art10ThreadList22SweepInterpreterCachesEPNS_15IsMarkedVisitorE"
+    },
+    {
+      "offset": "0x7b1250",
+      "size": 592,
+      "name": "_ZN3art11ClassLinker16NumLoadedClassesEv"
+    },
+    {
+      "offset": "0x5c39d0",
+      "size": 5140,
+      "name": "_ZN3art11ClassLinker16CreateProxyClassERNS_33ScopedObjectAccessAlreadyRunnableEP8_jstringP13_jobjectArrayP8_jobjectS6_S6_"
+    },
+    {
+      "offset": "0x828e60",
+      "size": 120,
+      "name": "_ZN3art3jit12JitCodeCache21NotifyMethodRedefinedEPNS_9ArtMethodE"
+    },
+    {
+      "offset": "0x261850",
+      "size": 236,
+      "name": "_ZN3art9ArtMethod28FindObsoleteDexClassDefIndexEv"
+    },
+    {
+      "offset": "0x4ef7a0",
+      "size": 184,
+      "name": "_ZN3art11ClassLinker17IsBootClassLoaderENS_6ObjPtrINS_6mirror6ObjectEEE"
+    },
+    {
+      "offset": "0x6a4b40",
+      "size": 44,
+      "name": "_ZNK3art9OatHeader27GetQuickToInterpreterBridgeEv"
+    },
+    {
+      "offset": "0x5aba40",
+      "size": 384,
+      "name": "_ZN3art11ClassLinker19RegisterClassLoaderENS_6ObjPtrINS_6mirror11ClassLoaderEEE"
+    },
+    {
+      "offset": "0x29c9c0",
+      "size": 400,
+      "name": "_ZN3art11ClassLinker26PrepareToDeleteClassLoaderEPNS_6ThreadERKNS0_15ClassLoaderDataEb"
+    },
+    {
+      "offset": "0xc2d0c0",
+      "size": 8,
+      "name": "_ZZN3art11ClassLinker12DexCacheDataC1EvE20s_registration_count"
+    },
+    {
+      "offset": "0x93ae30",
+      "size": 24,
+      "name": "_ZN3art8VdexFile14VdexFileHeaderC2Eb"
+    },
+    {
+      "offset": "0x305bb0",
+      "size": 536,
+      "name": "_ZN3art11ClassLinker15DoResolveStringENS_3dex11StringIndexENS_6ObjPtrINS_6mirror8DexCacheEEE"
+    },
+    {
+      "offset": "0x3c94d0",
+      "size": 688,
+      "name": "_ZNK3art12StackVisitor7GetVRegEPNS_9ArtMethodEtNS_8VRegKindEPjNSt3__18optionalINS_19DexRegisterLocationEEEb"
+    },
+    {
+      "offset": "0x7a6c10",
+      "size": 596,
+      "name": "_ZN3art11ClassLinker32SizeOfClassWithoutEmbeddedTablesERKNS_7DexFileERKNS_3dex8ClassDefE"
+    },
+    {
+      "offset": "0x4edc40",
+      "size": 708,
+      "name": "_ZN3art8VdexFile13OpenAtAddressEPhmbimRKNSt3__112basic_stringIcNS2_11char_traitsIcEENS2_9allocatorIcEEEEbbPS8_"
+    },
+    {
+      "offset": "0x54d9a0",
+      "size": 120,
+      "name": "_ZNK3art11ClassLinker16NumZygoteClassesEv"
+    },
+    {
+      "offset": "0x7a9940",
+      "size": 204,
+      "name": "_ZN3art11ClassLinker18LinkInstanceFieldsEPNS_6ThreadENS_6HandleINS_6mirror5ClassEEE"
+    },
+    {
+      "offset": "0x8b81c0",
+      "size": 44,
+      "name": "_ZN3art6mirror8ClassExt18SetOriginalDexFileENS_6ObjPtrINS0_6ObjectEEE"
+    },
+    {
+      "offset": "0x7a7790",
+      "size": 160,
+      "name": "_ZN3art11ClassLinker31WriteBarrierOnClassLoaderLockedENS_6ObjPtrINS_6mirror11ClassLoaderEEENS1_INS2_6ObjectEEE"
+    },
+    {
+      "offset": "0xa1a068",
+      "size": 88,
+      "name": "_ZTVN3art22MemoryDexFileContainerE"
+    },
+    {
+      "offset": "0x2d8ba0",
+      "size": 42464,
+      "name": "_ZN3art11ClassLinker9LinkClassEPNS_6ThreadEPKcNS_6HandleINS_6mirror5ClassEEENS5_INS6_11ObjectArrayIS7_EEEEPNS_13MutableHandleIS7_EE"
+    },
+    {
+      "offset": "0x429cc0",
+      "size": 324,
+      "name": "_ZN3art11ClassLinker40MakeInitializedClassesVisiblyInitializedEPNS_6ThreadEb"
+    },
+    {
+      "offset": "0x91e130",
+      "size": 68,
+      "name": "_ZN3art12StackVisitor16SetVRegReferenceEPNS_9ArtMethodEtNS_6ObjPtrINS_6mirror6ObjectEEE"
+    },
+    {
+      "offset": "0x37c390",
+      "size": 352,
+      "name": "_ZN3art9ArtMethod22IsSignaturePolymorphicEv"
+    },
+    {
+      "offset": "0xc2cf50",
+      "size": 8,
+      "name": "_ZN3art5Locks25classlinker_classes_lock_E"
+    },
+    {
+      "offset": "0xa12be0",
+      "size": 88,
+      "name": "_ZTVN3art11ClassLinkerE"
+    },
+    {
+      "offset": "0x36d750",
+      "size": 444,
+      "name": "_ZN3art9ArtMethod12PrettyMethodEb"
+    },
+    {
+      "offset": "0x2d4510",
+      "size": 3800,
+      "name": "_ZN3art11ClassLinker10LoadMethodERKNS_7DexFileERKNS_13ClassAccessor6MethodENS_6ObjPtrINS_6mirror5ClassEEEPNS_9ArtMethodE"
+    },
+    {
+      "offset": "0xc30458",
+      "size": 8,
+      "name": "_ZN3art16WellKnownClasses28dalvik_system_DexFile_cookieE"
+    },
+    {
+      "offset": "0x2fe380",
+      "size": 448,
+      "name": "_ZN3art11ClassLinker20DoLookupResolvedTypeENS_3dex9TypeIndexENS_6ObjPtrINS_6mirror5ClassEEE"
+    },
+    {
+      "offset": "0x7b1930",
+      "size": 592,
+      "name": "_ZN3art11ClassLinker19RemoveDexFromCachesERKNS_7DexFileE"
+    },
+    {
+      "offset": "0x2cfeb0",
+      "size": 18016,
+      "name": "_ZN3art11ClassLinker9LoadClassEPNS_6ThreadERKNS_7DexFileERKNS_3dex8ClassDefENS_6HandleINS_6mirror5ClassEEE"
+    },
+    {
+      "offset": "0x422e10",
+      "size": 252,
+      "name": "_ZN3art11ClassLinker21AppendToBootClassPathEPNS_6ThreadEPKNS_7DexFileE"
+    },
+    {
+      "offset": "0x58f3b0",
+      "size": 524,
+      "name": "_ZN3art11ClassLinkerC1EPNS_11InternTableEb"
+    },
+    {
+      "offset": "0x4ec7a0",
+      "size": 424,
+      "name": "_ZNK3art18ClassLoaderContext19CheckDexFilesOpenedERKNSt3__112basic_stringIcNS1_11char_traitsIcEENS1_9allocatorIcEEEE"
+    },
+    {
+      "offset": "0x421ec0",
+      "size": 136,
+      "name": "_ZN3art11ClassLinker10AllocClassILb1EEENS_6ObjPtrINS_6mirror5ClassEEEPNS_6ThreadES5_j"
+    },
+    {
+      "offset": "0x450eb0",
+      "size": 168,
+      "name": "_ZN3art11ClassLinker18LookupResolvedTypeEPKcNS_6ObjPtrINS_6mirror11ClassLoaderEEE"
+    },
+    {
+      "offset": "0x653d90",
+      "size": 656,
+      "name": "_ZN3art9ArtMethod15EqualParametersENS_6HandleINS_6mirror11ObjectArrayINS2_5ClassEEEEE"
+    },
+    {
+      "offset": "0x7a65a0",
+      "size": 236,
+      "name": "_ZN3art11ClassLinker26AllocAndInitializeDexCacheEPNS_6ThreadERKNS_7DexFileENS_6ObjPtrINS_6mirror11ClassLoaderEEE"
+    },
+    {
+      "offset": "0xc30468",
+      "size": 8,
+      "name": "_ZN3art16WellKnownClasses42dalvik_system_DexPathList__Element_dexFileE"
+    },
+    {
+      "offset": "0x8b5f60",
+      "size": 4,
+      "name": "_ZN3art6mirror5Class15FindClassMethodENSt3__117basic_string_viewIcNS2_11char_traitsIcEEEERKNS_9SignatureENS_11PointerSizeE"
+    },
+    {
+      "offset": "0x7b05d0",
+      "size": 24,
+      "name": "_ZNK3art11ClassLinker31SetEntryPointsForObsoleteMethodEPNS_9ArtMethodE"
+    },
+    {
+      "offset": "0x4221c0",
+      "size": 560,
+      "name": "_ZN3art11ClassLinker20CreatePrimitiveClassEPNS_6ThreadENS_9Primitive4TypeENS_9ClassRootE"
+    },
+    {
+      "offset": "0x46d050",
+      "size": 964,
+      "name": "_ZN3art11ClassLinker24AddMethodToConflictTableENS_6ObjPtrINS_6mirror5ClassEEEPNS_9ArtMethodES6_S6_"
+    },
+    {
+      "offset": "0x5d77d0",
+      "size": 3172,
+      "name": "_ZN3art18ClassLoaderContext12OpenDexFilesERKNSt3__112basic_stringIcNS1_11char_traitsIcEENS1_9allocatorIcEEEERKNS1_6vectorIiNS5_IiEEEEb"
+    },
+    {
+      "offset": "0x6276d0",
+      "size": 18476,
+      "name": "_ZN3art11ClassLinker15InitializeClassEPNS_6ThreadENS_6HandleINS_6mirror5ClassEEEbb"
+    },
+    {
+      "offset": "0xa19160",
+      "size": 64,
+      "name": "_ZTVN3art13VariantMapKeyIPNSt3__16vectorINS1_10unique_ptrIKNS_7DexFileENS1_14default_deleteIS5_EEEENS1_9allocatorIS8_EEEEEE"
+    },
+    {
+      "offset": "0x7a91c0",
+      "size": 368,
+      "name": "_ZN3art11ClassLinker28FixupTemporaryDeclaringClassENS_6ObjPtrINS_6mirror5ClassEEES4_"
+    },
+    {
+      "offset": "0x4ed0d0",
+      "size": 860,
+      "name": "_ZN3art8VdexFile10OpenFromDmERKNSt3__112basic_stringIcNS1_11char_traitsIcEENS1_9allocatorIcEEEERKNS_10ZipArchiveE"
+    },
+    {
+      "offset": "0x90eea0",
+      "size": 1216,
+      "name": "_ZN3art7Runtime21AppendToBootClassPathERKNSt3__112basic_stringIcNS1_11char_traitsIcEENS1_9allocatorIcEEEES9_RKNS1_6vectorINS1_4pairIPKNS_7DexFileENS_6ObjPtrINS_6mirror8DexCacheEEEEENS5_ISJ_EEEE"
+    },
+    {
+      "offset": "0x3d2ac0",
+      "size": 120,
+      "name": "_ZN3art9ArtMethod21GetOatMethodQuickCodeENS_11PointerSizeE"
+    },
+    {
+      "offset": "0x7af380",
+      "size": 228,
+      "name": "_ZN3art11ClassLinker15ResolveFieldJLSEjNS_6HandleINS_6mirror8DexCacheEEENS1_INS2_11ClassLoaderEEE"
+    },
+    {
+      "offset": "0x7a0ed0",
+      "size": 40,
+      "name": "_ZN3art9ArtMethod18IsImagePointerSizeENS_11PointerSizeE"
+    },
+    {
+      "offset": "0x5a5350",
+      "size": 2108,
+      "name": "_ZN3art11ClassLinker15RegisterDexFileERKNS_7DexFileENS_6ObjPtrINS_6mirror11ClassLoaderEEE"
+    },
+    {
+      "offset": "0x7a6690",
+      "size": 64,
+      "name": "_ZN3art11ClassLinker10AllocClassEPNS_6ThreadEj"
+    },
+    {
+      "offset": "0x8e23d0",
+      "size": 8,
+      "name": "_ZNK3art9OatHeader20GetOatDexFilesOffsetEv"
+    },
+    {
+      "offset": "0xa12d88",
+      "size": 40,
+      "name": "_ZTVN3art11ClassLinker30FindVirtualMethodHolderVisitorE"
+    },
+    {
+      "offset": "0x8e3780",
+      "size": 272,
+      "name": "_ZN3art10OatDexFileC2EONS_15TypeLookupTableE"
+    },
+    {
+      "offset": "0x7a9af0",
+      "size": 208,
+      "name": "_ZN3art11ClassLinker30CreateReferenceInstanceOffsetsENS_6HandleINS_6mirror5ClassEEE"
+    },
+    {
+      "offset": "0x7b1520",
+      "size": 240,
+      "name": "_ZN3art11ClassLinker21CreatePathClassLoaderEPNS_6ThreadERKNSt3__16vectorIPKNS_7DexFileENS3_9allocatorIS7_EEEE"
+    },
+    {
+      "offset": "0xc30620",
+      "size": 8,
+      "name": "_ZN3art16WellKnownClasses30java_lang_reflect_Proxy_invokeE"
+    },
+    {
+      "offset": "0x655010",
+      "size": 120,
+      "name": "_ZN3art11ClassLinker19AllocArtMethodArrayEPNS_6ThreadEPNS_11LinearAllocEm"
+    },
+    {
+      "offset": "0x8e66d0",
+      "size": 1600,
+      "name": "_ZNK3art20OatQuickMethodHeader15ToNativeQuickPcEPNS_9ArtMethodEjb"
+    },
+    {
+      "offset": "0x5f75d0",
+      "size": 1328,
+      "name": "_ZNK3art15CompilerOptions28ShouldCompileWithClinitCheckEPNS_9ArtMethodE"
+    },
+    {
+      "offset": "0x93ae10",
+      "size": 20,
+      "name": "_ZNK3art8VdexFile14VdexFileHeader18IsVdexVersionValidEv"
+    },
+    {
+      "offset": "0x54d540",
+      "size": 1000,
+      "name": "_ZN3art11ClassLinker30VisitClassesWithoutClassesLockEPNS_12ClassVisitorE"
+    },
+    {
+      "offset": "0x7a5320",
+      "size": 28,
+      "name": "_ZNK3art11ClassLinker28IsJniDlsymLookupCriticalStubEPKv"
+    },
+    {
+      "offset": "0x655450",
+      "size": 564,
+      "name": "_ZN3art11ClassLinker17FindResolvedFieldENS_6ObjPtrINS_6mirror5ClassEEENS1_INS2_8DexCacheEEENS1_INS2_11ClassLoaderEEEjb"
+    },
+    {
+      "offset": "0x7a8500",
+      "size": 1044,
+      "name": "_ZN3art11ClassLinker34ResolveMethodExceptionHandlerTypesEPNS_9ArtMethodE"
+    },
+    {
+      "offset": "0x91e4d0",
+      "size": 348,
+      "name": "_ZN3art12StackVisitor9SetMethodEPNS_9ArtMethodE"
+    },
+    {
+      "offset": "0x7b18c0",
+      "size": 112,
+      "name": "_ZN3art11ClassLinker24SetEnablePublicSdkChecksEb"
+    },
+    {
+      "offset": "0x7a4ec0",
+      "size": 716,
+      "name": "_ZN3art11ClassLinker21ForceClassInitializedEPNS_6ThreadENS_6HandleINS_6mirror5ClassEEE"
+    },
+    {
+      "offset": "0x4a0410",
+      "size": 684,
+      "name": "_ZN3art11ClassLinker14RegisterNativeEPNS_6ThreadEPNS_9ArtMethodEPKv"
+    },
+    {
+      "offset": "0x550250",
+      "size": 1516,
+      "name": "_ZN3art11ClassLinker12FindDexCacheEPNS_6ThreadERKNS_7DexFileE"
+    },
+    {
+      "offset": "0x7a6e70",
+      "size": 1112,
+      "name": "_ZN3art11ClassLinker22LoadSuperAndInterfacesENS_6HandleINS_6mirror5ClassEEERKNS_7DexFileE"
+    },
+    {
+      "offset": "0x43f3d0",
+      "size": 820,
+      "name": "_ZN3art11ClassLinker17ResolveMethodTypeEPNS_6ThreadENS_3dex10ProtoIndexEPNS_9ArtMethodE"
+    },
+    {
+      "offset": "0x926610",
+      "size": 92,
+      "name": "_ZN3art6Thread25ClearAllInterpreterCachesEv"
+    },
+    {
+      "offset": "0x7a8a70",
+      "size": 924,
+      "name": "_ZNK3art11ClassLinker21CheckProxyConstructorEPNS_9ArtMethodE"
+    },
+    {
+      "offset": "0x442b80",
+      "size": 468,
+      "name": "_ZN3art11ClassLinker17ResolveMethodTypeEPNS_6ThreadENS_3dex10ProtoIndexENS_6HandleINS_6mirror8DexCacheEEENS5_INS6_11ClassLoaderEEENS6_13RawMethodTypeE"
+    },
+    {
+      "offset": "0xc30608",
+      "size": 8,
+      "name": "_ZN3art16WellKnownClasses36java_lang_invoke_MethodType_makeImplE"
+    },
+    {
+      "offset": "0x7a9a10",
+      "size": 216,
+      "name": "_ZN3art11ClassLinker16LinkStaticFieldsEPNS_6ThreadENS_6HandleINS_6mirror5ClassEEEPm"
+    },
+    {
+      "offset": "0x4ecc70",
+      "size": 832,
+      "name": "_ZN3art18ClassLoaderContext25CheckForDuplicateDexFilesERKNSt3__16vectorIPKNS_7DexFileENS1_9allocatorIS5_EEEE"
+    },
+    {
+      "offset": "0x421f50",
+      "size": 260,
+      "name": "_ZN3art11ClassLinker25FinishCoreArrayClassSetupENS_9ClassRootE"
+    },
+    {
+      "offset": "0x617540",
+      "size": 7044,
+      "name": "_ZN3art11ClassLinker13AddImageSpaceEPNS_2gc5space10ImageSpaceENS_6HandleINS_6mirror11ClassLoaderEEEPNS_18ClassLoaderContextERKNSt3__16vectorINSB_10unique_ptrIKNS_7DexFileENSB_14default_deleteISF_EEEENSB_9allocatorISI_EEEEPNSB_12basic_stringIcNSB_11char_traitsIcEENSJ_IcEEEE"
+    },
+    {
+      "offset": "0x6568e0",
+      "size": 1600,
+      "name": "_ZNK3art18ClassLoaderContext17CreateClassLoaderERKNSt3__16vectorIPKNS_7DexFileENS1_9allocatorIS5_EEEE"
+    },
+    {
+      "offset": "0x507450",
+      "size": 260,
+      "name": "_ZN3art11ClassLinker34WriteBarrierForBootOatFileBssRootsEPKNS_7OatFileE"
+    },
+    {
+      "offset": "0x7a7400",
+      "size": 20,
+      "name": "_ZN3art11ClassLinker24ClassTableForClassLoaderENS_6ObjPtrINS_6mirror11ClassLoaderEEE"
+    },
+    {
+      "offset": "0x28c200",
+      "size": 1444,
+      "name": "_ZN3art11ClassLinker11LookupClassEPNS_6ThreadEPKcmNS_6ObjPtrINS_6mirror11ClassLoaderEEE"
+    },
+    {
+      "offset": "0x204340",
+      "size": 684,
+      "name": "_ZN3art11ClassLinker18FindResolvedMethodENS_6ObjPtrINS_6mirror5ClassEEENS1_INS2_8DexCacheEEENS1_INS2_11ClassLoaderEEEj"
+    },
+    {
+      "offset": "0x6a4d00",
+      "size": 100,
+      "name": "_ZN3art10OatDexFileD2Ev"
+    },
+    {
+      "offset": "0x7a7860",
+      "size": 884,
+      "name": "_ZN3art11ClassLinker14FindClassTableEPNS_6ThreadENS_6ObjPtrINS_6mirror8DexCacheEEE"
+    },
+    {
+      "offset": "0x7a62b0",
+      "size": 36,
+      "name": "_ZN3art11ClassLinkerD0Ev"
+    },
+    {
+      "offset": "0xc30688",
+      "size": 8,
+      "name": "_ZN3art16WellKnownClasses30dalvik_system_DexFile_fileNameE"
+    },
+    {
+      "offset": "0x5f48f0",
+      "size": 1028,
+      "name": "_ZN3art11ClassLinker24FillIMTAndConflictTablesENS_6ObjPtrINS_6mirror5ClassEEE"
+    },
+    {
+      "offset": "0x37b8d0",
+      "size": 260,
+      "name": "_ZN3art9ArtMethod20GetNonObsoleteMethodEv"
+    },
+    {
+      "offset": "0x36d730",
+      "size": 28,
+      "name": "_ZN3art9ArtMethod12PrettyMethodEPS0_b"
+    },
+    {
+      "offset": "0x4575e0",
+      "size": 224,
+      "name": "_ZN3art11ClassLinker19GetRegisteredNativeEPNS_6ThreadEPNS_9ArtMethodE"
+    },
+    {
+      "offset": "0x4dd780",
+      "size": 756,
+      "name": "_ZN3art11ClassLinker24OpenAndInitImageDexFilesEPKNS_2gc5space10ImageSpaceENS_6HandleINS_6mirror11ClassLoaderEEEPNSt3__16vectorINSA_10unique_ptrIKNS_7DexFileENSA_14default_deleteISE_EEEENSA_9allocatorISH_EEEEPNSA_12basic_stringIcNSA_11char_traitsIcEENSI_IcEEEE"
+    },
+    {
+      "offset": "0x4750a0",
+      "size": 56,
+      "name": "_ZN3art9ArtMethod19FromReflectedMethodERKNS_33ScopedObjectAccessAlreadyRunnableEP8_jobject"
+    },
+    {
+      "offset": "0x2c40b0",
+      "size": 2176,
+      "name": "_ZN3art11ClassLinker38FindClassInBaseDexClassLoaderClassPathEPNS_6ThreadEPKcmNS_6HandleINS_6mirror11ClassLoaderEEEPNS_6ObjPtrINS6_5ClassEEE"
+    },
+    {
+      "offset": "0x54da20",
+      "size": 120,
+      "name": "_ZNK3art11ClassLinker19NumNonZygoteClassesEv"
+    },
+    {
+      "offset": "0x45aaa0",
+      "size": 4096,
+      "name": "_ZN3art8verifier13ClassVerifier11VerifyClassEPNS_6ThreadEPNS0_12VerifierDepsEPKNS_7DexFileENS_6HandleINS_6mirror5ClassEEENS9_INSA_8DexCacheEEENS9_INSA_11ClassLoaderEEERKNS_3dex8ClassDefEPNS_17CompilerCallbacksENS0_15HardFailLogModeEjPNSt3__112basic_stringIcNSO_11char_traitsIcEENSO_9allocatorIcEEEE"
+    },
+    {
+      "offset": "0x56a490",
+      "size": 6920,
+      "name": "_ZN3art11ClassLinker11VerifyClassEPNS_6ThreadEPNS_8verifier12VerifierDepsENS_6HandleINS_6mirror5ClassEEENS3_15HardFailLogModeE"
+    },
+    {
+      "offset": "0x553150",
+      "size": 144,
+      "name": "_ZNK3art11ClassLinker14VisitDexCachesEPNS_15DexCacheVisitorE"
+    },
+    {
+      "offset": "0x478c70",
+      "size": 28,
+      "name": "_ZN3art11ClassLinker17AllocPointerArrayEPNS_6ThreadEm"
+    },
+    {
+      "offset": "0x7af470",
+      "size": 1776,
+      "name": "_ZN3art11ClassLinker27ResolveMethodHandleForFieldEPNS_6ThreadERKNS_3dex16MethodHandleItemEPNS_9ArtMethodE"
+    },
+    {
+      "offset": "0x59d040",
+      "size": 496,
+      "name": "_ZN3art3jit3Jit15TryPatternMatchEPNS_9ArtMethodENS_15CompilationKindE"
+    },
+    {
+      "offset": "0x93ae50",
+      "size": 68,
+      "name": "_ZNK3art8VdexFile18GetNextDexFileDataEPKhj"
+    },
+    {
+      "offset": "0x94eca0",
+      "size": 1932,
+      "name": "_ZN3art8verifier12VerifierDeps15ParseStoredDataERKNSt3__16vectorIPKNS_7DexFileENS2_9allocatorIS6_EEEENS_8ArrayRefIKhEE"
+    },
+    {
+      "offset": "0x8dff60",
+      "size": 20,
+      "name": "_ZN3art14AotClassLinker13SetSdkCheckerEONSt3__110unique_ptrINS_10SdkCheckerENS1_14default_deleteIS3_EEEE"
+    },
+    {
+      "offset": "0x7b0360",
+      "size": 132,
+      "name": "_ZN3art11ClassLinker19ResolveMethodHandleEPNS_6ThreadEjPNS_9ArtMethodE"
+    },
+    {
+      "offset": "0x7a72f0",
+      "size": 48,
+      "name": "_ZN3art11ClassLinker9LoadFieldERKNS_13ClassAccessor5FieldENS_6HandleINS_6mirror5ClassEEEPNS_8ArtFieldE"
+    },
+    {
+      "offset": "0x7a7d40",
+      "size": 68,
+      "name": "_ZN3art11ClassLinker18UpdateClassMethodsENS_6ObjPtrINS_6mirror5ClassEEEPNS_19LengthPrefixedArrayINS_9ArtMethodEEE"
+    },
+    {
+      "offset": "0x56c4b0",
+      "size": 488,
+      "name": "_ZN3art8verifier12VerifierDepsC1ERKNSt3__16vectorIPKNS_7DexFileENS2_9allocatorIS6_EEEEb"
+    },
+    {
+      "offset": "0x378320",
+      "size": 8640,
+      "name": "_ZN3art6mirror5Class15FindClassMethodENS_6ObjPtrINS0_8DexCacheEEEjNS_11PointerSizeE"
+    },
+    {
+      "offset": "0x5c4ec0",
+      "size": 328,
+      "name": "_ZN3art11ClassLinker20MarkClassInitializedEPNS_6ThreadENS_6HandleINS_6mirror5ClassEEE"
+    },
+    {
+      "offset": "0x4dd4a0",
+      "size": 532,
+      "name": "_ZN3art11ClassLinker14AddImageSpacesENS_8ArrayRefIPNS_2gc5space10ImageSpaceEEENS_6HandleINS_6mirror11ClassLoaderEEEPNS_18ClassLoaderContextEPNSt3__16vectorINSD_10unique_ptrIKNS_7DexFileENSD_14default_deleteISH_EEEENSD_9allocatorISK_EEEEPNSD_12basic_stringIcNSD_11char_traitsIcEENSL_IcEEEE"
+    },
+    {
+      "offset": "0x828650",
+      "size": 868,
+      "name": "_ZN3art3jit12JitCodeCache12RemoveMethodEPNS_9ArtMethodEb"
+    },
+    {
+      "offset": "0x4a09e0",
+      "size": 744,
+      "name": "_ZN3art16RuntimeCallbacks20RegisterNativeMethodEPNS_9ArtMethodEPKvPPv"
+    },
+    {
+      "offset": "0x4dc3b0",
+      "size": 1736,
+      "name": "_ZN3art11ClassLinker17InitFromBootImageEPNSt3__112basic_stringIcNS1_11char_traitsIcEENS1_9allocatorIcEEEE"
+    },
+    {
+      "offset": "0x828ee0",
+      "size": 476,
+      "name": "_ZN3art3jit12JitCodeCache18MoveObsoleteMethodEPNS_9ArtMethodES3_"
+    },
+    {
+      "offset": "0x3bc720",
+      "size": 1332,
+      "name": "_ZN3art3jit3Jit23MaybeEnqueueCompilationEPNS_9ArtMethodEPNS_6ThreadE"
+    },
+    {
+      "offset": "0xa1a030",
+      "size": 56,
+      "name": "_ZTVNSt3__120__shared_ptr_emplaceIN3art22MemoryDexFileContainerENS_9allocatorIS2_EEEE"
+    },
+    {
+      "offset": "0x3087e0",
+      "size": 4188,
+      "name": "_ZN3art7OatFile12FindOatClassERKNS_7DexFileEtPb"
+    },
+    {
+      "offset": "0x58f3b0",
+      "size": 524,
+      "name": "_ZN3art11ClassLinkerC2EPNS_11InternTableEb"
+    },
+    {
+      "offset": "0x42bbc0",
+      "size": 268,
+      "name": "_ZN3art11ClassLinker30VisiblyInitializedCallbackDoneEPNS_6ThreadEPNS0_26VisiblyInitializedCallbackE"
+    },
+    {
+      "offset": "0x505a40",
+      "size": 136,
+      "name": "_ZN3art16OatFileAssistant11HasDexFilesEPNSt3__112basic_stringIcNS1_11char_traitsIcEENS1_9allocatorIcEEEE"
+    },
+    {
+      "offset": "0x3dc970",
+      "size": 672,
+      "name": "_ZN3art11ClassLinker22WaitForInitializeClassENS_6HandleINS_6mirror5ClassEEEPNS_6ThreadERNS_10ObjectLockIS3_EE"
+    },
+    {
+      "offset": "0x90f360",
+      "size": 1224,
+      "name": "_ZN3art7Runtime20AddExtraBootDexFilesERKNSt3__112basic_stringIcNS1_11char_traitsIcEENS1_9allocatorIcEEEES9_ONS1_6vectorINS1_10unique_ptrIKNS_7DexFileENS1_14default_deleteISD_EEEENS5_ISG_EEEE"
+    },
+    {
+      "offset": "0x828110",
+      "size": 384,
+      "name": "_ZN3art3jit12JitCodeCache14ContainsMethodEPNS_9ArtMethodE"
+    },
+    {
+      "offset": "0x7a6040",
+      "size": 24,
+      "name": "_ZN3art11ClassLinker23DropFindArrayClassCacheEv"
+    },
+    {
+      "offset": "0x7a0e60",
+      "size": 104,
+      "name": "_ZN3art9ArtMethod15SetNotIntrinsicEv"
+    },
+    {
+      "offset": "0x422080",
+      "size": 216,
+      "name": "_ZN3art11ClassLinker24AllocPrimitiveArrayClassEPNS_6ThreadENS_9ClassRootES3_"
+    },
+    {
+      "offset": "0x45d2c0",
+      "size": 896,
+      "name": "_ZN3art11annotations36GetNativeMethodAnnotationAccessFlagsERKNS_7DexFileERKNS_3dex8ClassDefEj"
+    },
+    {
+      "offset": "0x7a5340",
+      "size": 28,
+      "name": "_ZNK3art11ClassLinker20IsJniDlsymLookupStubEPKv"
+    },
+    {
+      "offset": "0x36e390",
+      "size": 1488,
+      "name": "_ZN3art11ClassLinker13DoResolveTypeIPNS_9ArtMethodEEENS_6ObjPtrINS_6mirror5ClassEEENS_3dex9TypeIndexET_"
+    },
+    {
+      "offset": "0x54dd00",
+      "size": 580,
+      "name": "_ZN3art11ClassLinker12VisitClassesEPNS_12ClassVisitorE"
+    },
+    {
+      "offset": "0x397bd0",
+      "size": 484,
+      "name": "_ZN3art11ClassLinker15DoResolveStringENS_3dex11StringIndexENS_6HandleINS_6mirror8DexCacheEEE"
+    },
+    {
+      "offset": "0x6ad590",
+      "size": 2264,
+      "name": "_ZNK3art8verifier12VerifierDeps20ValidateDependenciesEPNS_6ThreadENS_6HandleINS_6mirror11ClassLoaderEEERKNSt3__16vectorIPKNS_7DexFileENS8_9allocatorISC_EEEEPNS8_12basic_stringIcNS8_11char_traitsIcEENSD_IcEEEE"
+    },
+    {
+      "offset": "0x257090",
+      "size": 108,
+      "name": "_ZN3art6mirror5Class20FindClassInitializerENS_11PointerSizeE"
+    },
+    {
+      "offset": "0x654fa0",
+      "size": 100,
+      "name": "_ZN3art11ClassLinker18AllocArtFieldArrayEPNS_6ThreadEPNS_11LinearAllocEm"
+    },
+    {
+      "offset": "0x55c830",
+      "size": 1540,
+      "name": "_ZN3art16OatFileAssistant25DexLocationToOdexFilenameERKNSt3__112basic_stringIcNS1_11char_traitsIcEENS1_9allocatorIcEEEENS_14InstructionSetEPS7_SB_"
+    },
+    {
+      "offset": "0x2a2070",
+      "size": 204,
+      "name": "_ZN3art11ClassLinker10VisitRootsEPNS_11RootVisitorENS_14VisitRootFlagsEb"
+    },
+    {
+      "offset": "0x7a72d0",
+      "size": 28,
+      "name": "_ZN3art11ClassLinker26GetAllocatorForClassLoaderENS_6ObjPtrINS_6mirror11ClassLoaderEEE"
+    },
+    {
+      "offset": "0x911d50",
+      "size": 284,
+      "name": "_ZN3art16RuntimeCallbacks14ClassPreDefineEPKcNS_6HandleINS_6mirror5ClassEEENS3_INS4_11ClassLoaderEEERKNS_7DexFileERKNS_3dex8ClassDefEPPSA_PPSE_"
+    },
+    {
+      "offset": "0x93adf0",
+      "size": 24,
+      "name": "_ZNK3art8VdexFile14VdexFileHeader12IsMagicValidEv"
+    },
+    {
+      "offset": "0x7a0740",
+      "size": 1464,
+      "name": "_ZN3art9ArtMethod20FindOverriddenMethodENS_11PointerSizeE"
+    },
+    {
+      "offset": "0xc305f0",
+      "size": 8,
+      "name": "_ZN3art16WellKnownClasses37java_lang_invoke_MethodHandles_lookupE"
+    },
+    {
+      "offset": "0x24e020",
+      "size": 896,
+      "name": "_ZN3art9ArtMethod32FindDexMethodIndexInOtherDexFileERKNS_7DexFileEj"
+    },
+    {
+      "offset": "0xc305f8",
+      "size": 8,
+      "name": "_ZN3art16WellKnownClasses43java_lang_invoke_MethodHandles_makeIdentityE"
+    },
+    {
+      "offset": "0x8dfd50",
+      "size": 524,
+      "name": "_ZN3art14AotClassLinker32CanReferenceInBootImageExtensionENS_6ObjPtrINS_6mirror5ClassEEEPNS_2gc4HeapE"
+    },
+    {
+      "offset": "0x91e0e0",
+      "size": 68,
+      "name": "_ZN3art12StackVisitor7SetVRegEPNS_9ArtMethodEtjNS_8VRegKindE"
+    },
+    {
+      "offset": "0x5bb160",
+      "size": 4248,
+      "name": "_ZN3art11ClassLinker14EnsureResolvedEPNS_6ThreadEPKcNS_6ObjPtrINS_6mirror5ClassEEE"
+    },
+    {
+      "offset": "0x561fa0",
+      "size": 176,
+      "name": "_ZN3art11ClassLinker25MoveClassTableToPreZygoteEv"
+    },
+    {
+      "offset": "0xc2fb40",
+      "size": 32,
+      "name": "_ZN3art18RuntimeArgumentMap27MadviseWillNeedOdexFileSizeE"
+    },
+    {
+      "offset": "0x59bca0",
+      "size": 628,
+      "name": "_ZN3art11ClassLinker22FixupStaticTrampolinesEPNS_6ThreadENS_6ObjPtrINS_6mirror5ClassEEE"
+    },
+    {
+      "offset": "0x42efc0",
+      "size": 1708,
+      "name": "_ZN3art11ClassLinker29ValidateSuperClassDescriptorsENS_6HandleINS_6mirror5ClassEEE"
+    },
+    {
+      "offset": "0x7a74f0",
+      "size": 500,
+      "name": "_ZN3art11ClassLinker24RegisterExistingDexCacheENS_6ObjPtrINS_6mirror8DexCacheEEENS1_INS2_11ClassLoaderEEE"
+    },
+    {
+      "offset": "0x94e530",
+      "size": 76,
+      "name": "_ZNK3art8verifier12VerifierDeps14GetDexFileDepsERKNS_7DexFileE"
+    },
+    {
+      "offset": "0x7a4dd0",
+      "size": 92,
+      "name": "_ZN3art11ClassLinker10AllocClassILb0EEENS_6ObjPtrINS_6mirror5ClassEEEPNS_6ThreadES5_j"
+    },
+    {
+      "offset": "0x93c1c0",
+      "size": 376,
+      "name": "_ZN3art8verifier14MethodVerifier19VerifyMethodAndDumpEPNS_6ThreadEPNS_31VariableIndentationOutputStreamEjPKNS_7DexFileENS_6HandleINS_6mirror8DexCacheEEENS9_INSA_11ClassLoaderEEERKNS_3dex8ClassDefEPKNSF_8CodeItemEjj"
+    },
+    {
+      "offset": "0x7aede0",
+      "size": 124,
+      "name": "_ZN3art11ClassLinker16LinkFieldsHelper42FieldTypeOrderFromFirstDescriptorCharacterEc"
+    },
+    {
+      "offset": "0x269180",
+      "size": 612,
+      "name": "_ZN3art13ProfilingInfo6CreateEPNS_6ThreadEPNS_9ArtMethodERKNSt3__16vectorIjNS5_9allocatorIjEEEE"
+    },
+    {
+      "offset": "0x253a60",
+      "size": 508,
+      "name": "_ZN3art11ClassLinker14DoLookupStringENS_3dex11StringIndexENS_6ObjPtrINS_6mirror8DexCacheEEE"
+    },
+    {
+      "offset": "0x44c1d0",
+      "size": 148,
+      "name": "_ZNK3art11ClassLinker17VisitClassLoadersEPNS_18ClassLoaderVisitorE"
+    },
+    {
+      "offset": "0x7b05c0",
+      "size": 12,
+      "name": "_ZNK3art11ClassLinker29GetRuntimeQuickGenericJniStubEv"
+    },
+    {
+      "offset": "0x422510",
+      "size": 620,
+      "name": "_ZN3art11ClassLinker16CheckSystemClassEPNS_6ThreadENS_6HandleINS_6mirror5ClassEEEPKc"
+    },
+    {
+      "offset": "0x4a6cd0",
+      "size": 1292,
+      "name": "_ZN3art11ClassLinker14RunRootClinitsEPNS_6ThreadE"
+    },
+    {
+      "offset": "0x8e3780",
+      "size": 272,
+      "name": "_ZN3art10OatDexFileC1EONS_15TypeLookupTableE"
+    },
+    {
+      "offset": "0x5585d0",
+      "size": 312,
+      "name": "_ZN3art11ClassLinker17ResolveMethodTypeEPNS_6ThreadENS_3dex10ProtoIndexENS_6HandleINS_6mirror8DexCacheEEENS5_INS6_11ClassLoaderEEE"
+    },
+    {
+      "offset": "0x48b370",
+      "size": 692,
+      "name": "_ZN3art16RuntimeCallbacks14EndDefineClassEv"
+    },
+    {
+      "offset": "0xc305e0",
+      "size": 8,
+      "name": "_ZN3art16WellKnownClasses36java_lang_invoke_MethodHandle_asTypeE"
+    },
+    {
+      "offset": "0x7b14e0",
+      "size": 52,
+      "name": "_ZN3art11ClassLinker15GetDexLockOwnerEv"
+    },
+    {
+      "offset": "0x5a5130",
+      "size": 536,
+      "name": "_ZN3art10OatDexFile12FindClassDefERKNS_7DexFileEPKcm"
+    },
+    {
+      "offset": "0x37d4e0",
+      "size": 344,
+      "name": "_ZN3art9ArtMethod23HasSameNameAndSignatureEPS0_"
+    },
+    {
+      "offset": "0x7a8e10",
+      "size": 940,
+      "name": "_ZNK3art11ClassLinker16CheckProxyMethodEPNS_9ArtMethodES2_"
+    },
+    {
+      "offset": "0x7a9fd0",
+      "size": 120,
+      "name": "_ZN3art11ClassLinker22CreateImtConflictTableEmPNS_11LinearAllocENS_11PointerSizeE"
+    },
+    {
+      "offset": "0x93aea0",
+      "size": 520,
+      "name": "_ZNK3art8VdexFile15OpenAllDexFilesEPNSt3__16vectorINS1_10unique_ptrIKNS_7DexFileENS1_14default_deleteIS5_EEEENS1_9allocatorIS8_EEEEPNS1_12basic_stringIcNS1_11char_traitsIcEENS9_IcEEEE"
+    },
+    {
+      "offset": "0x41f370",
+      "size": 10856,
+      "name": "_ZN3art11ClassLinker16InitWithoutImageENSt3__16vectorINS1_10unique_ptrIKNS_7DexFileENS1_14default_deleteIS5_EEEENS1_9allocatorIS8_EEEEPNS1_12basic_stringIcNS1_11char_traitsIcEENS9_IcEEEE"
+    },
+    {
+      "offset": "0xc2fb20",
+      "size": 32,
+      "name": "_ZN3art18RuntimeArgumentMap27MadviseWillNeedVdexFileSizeE"
+    },
+    {
+      "offset": "0x463890",
+      "size": 784,
+      "name": "_ZN3art11ClassLinker21FinishArrayClassSetupENS_6ObjPtrINS_6mirror5ClassEEE"
+    },
+    {
+      "offset": "0x421de0",
+      "size": 220,
+      "name": "_ZN3art11ClassLinker12SetClassRootENS_9ClassRootENS_6ObjPtrINS_6mirror5ClassEEE"
+    },
+    {
+      "offset": "0x2c4930",
+      "size": 26844,
+      "name": "_ZN3art11ClassLinker11DefineClassEPNS_6ThreadEPKcmNS_6HandleINS_6mirror11ClassLoaderEEERKNS_7DexFileERKNS_3dex8ClassDefE"
+    },
+    {
+      "offset": "0x297380",
+      "size": 1032,
+      "name": "_ZN3art11ClassLinker19CleanupClassLoadersEv"
+    },
+    {
+      "offset": "0x57b260",
+      "size": 352,
+      "name": "_ZNK3art9OatHeader33GetQuickToInterpreterBridgeOffsetEv"
+    },
+    {
+      "offset": "0x377f60",
+      "size": 840,
+      "name": "_ZN3art6mirror5Class29FindAccessibleInterfaceMethodEPNS_9ArtMethodENS_11PointerSizeE"
+    },
+    {
+      "offset": "0x654880",
+      "size": 1656,
+      "name": "_ZN3art11ClassLinker15VisitClassRootsEPNS_11RootVisitorENS_14VisitRootFlagsE"
+    },
+    {
+      "offset": "0xa19ff0",
+      "size": 32,
+      "name": "_ZTVN3art16ArtDexFileLoaderE"
+    },
+    {
+      "offset": "0x816310",
+      "size": 24,
+      "name": "_ZN3art16InterpreterCache5ClearEPNS_6ThreadE"
+    },
+    {
+      "offset": "0x91e180",
+      "size": 276,
+      "name": "_ZN3art12StackVisitor11SetVRegPairEPNS_9ArtMethodEtmNS_8VRegKindES3_"
+    },
+    {
+      "offset": "0x57b0b0",
+      "size": 160,
+      "name": "_ZN3art17CanMethodUseNterpEPNS_9ArtMethodENS_14InstructionSetE"
+    },
+    {
+      "offset": "0x62bf00",
+      "size": 896,
+      "name": "_ZN3art11ClassLinker20CanWeInitializeClassENS_6ObjPtrINS_6mirror5ClassEEEbb"
+    },
+    {
+      "offset": "0x7a0e40",
+      "size": 20,
+      "name": "_ZN3art9ArtMethod12SetIntrinsicEj"
+    },
+    {
+      "offset": "0x80ccd0",
+      "size": 340,
+      "name": "_ZN3art15instrumentation15Instrumentation21InitializeMethodsCodeEPNS_9ArtMethodEPKv"
+    },
+    {
+      "offset": "0x7a6060",
+      "size": 504,
+      "name": "_ZN3art11ClassLinkerD1Ev"
+    },
+    {
+      "offset": "0x7b05a0",
+      "size": 28,
+      "name": "_ZNK3art11ClassLinker21IsQuickGenericJniStubEPKv"
+    },
+    {
+      "offset": "0x426af0",
+      "size": 4452,
+      "name": "_ZN3art11ClassLinker10FinishInitEPNS_6ThreadE"
+    },
+    {
+      "offset": "0x80e7c0",
+      "size": 700,
+      "name": "_ZN3art15instrumentation15Instrumentation12UndeoptimizeEPNS_9ArtMethodE"
+    },
+    {
+      "offset": "0x37d3c0",
+      "size": 288,
+      "name": "_ZN3art11ClassLinker20LookupPrimitiveClassEc"
+    },
+    {
+      "offset": "0x5f5710",
+      "size": 4360,
+      "name": "_ZN3art11ClassLinker18FillIMTFromIfTableENS_6ObjPtrINS_6mirror7IfTableEEEPNS_9ArtMethodES6_NS1_INS2_5ClassEEEbbPbPS6_"
+    },
+    {
+      "offset": "0x381b00",
+      "size": 236,
+      "name": "_ZN3art15instrumentation15Instrumentation13IsDeoptimizedEPNS_9ArtMethodE"
+    },
+    {
+      "offset": "0x8e23e0",
+      "size": 8,
+      "name": "_ZN3art9OatHeader20SetOatDexFilesOffsetEj"
+    },
+    {
+      "offset": "0x3ba590",
+      "size": 1360,
+      "name": "_ZN3art9ArtMethod24ThrowInvocationTimeErrorENS_6ObjPtrINS_6mirror6ObjectEEE"
+    },
+    {
+      "offset": "0x7a7830",
+      "size": 48,
+      "name": "_ZN3art11ClassLinker22FindDexCacheDataLockedERKNS_10OatDexFileE"
+    },
+    {
+      "offset": "0x5c7ac0",
+      "size": 432,
+      "name": "_ZN3art3jni12JniIdManager14EncodeMethodIdEPNS_9ArtMethodE"
+    },
+    {
+      "offset": "0x7a5780",
+      "size": 264,
+      "name": "_ZN3art11ClassLinker22FindDexCacheDataLockedERKNS_7DexFileE"
+    },
+    {
+      "offset": "0x7b17e0",
+      "size": 112,
+      "name": "_ZNK3art11ClassLinker26DenyAccessBasedOnPublicSdkEPNS_8ArtFieldE"
+    },
+    {
+      "offset": "0xa12c38",
+      "size": 40,
+      "name": "_ZTVN3art11ClassLinker26VisiblyInitializedCallbackE"
+    },
+    {
+      "offset": "0x2045f0",
+      "size": 972,
+      "name": "_ZN3art9ArtMethod19GetObsoleteDexCacheILNS_17ReadBarrierOptionE0EEENS_6ObjPtrINS_6mirror8DexCacheEEEv"
+    },
+    {
+      "offset": "0x54a6e0",
+      "size": 352,
+      "name": "_ZN3art11ClassLinker19RunEarlyRootClinitsEPNS_6ThreadE"
+    },
+    {
+      "offset": "0x4dde70",
+      "size": 252,
+      "name": "_ZNK3art10OatDexFile11OpenDexFileEPNSt3__112basic_stringIcNS1_11char_traitsIcEENS1_9allocatorIcEEEE"
+    },
+    {
+      "offset": "0x7a9e40",
+      "size": 296,
+      "name": "_ZN3art11ClassLinker9SetIMTRefEPNS_9ArtMethodES2_S2_PbPS2_"
+    },
+    {
+      "offset": "0x7a5190",
+      "size": 388,
+      "name": "_ZN3art11ClassLinker16UnregisterNativeEPNS_6ThreadEPNS_9ArtMethodE"
+    },
+    {
+      "offset": "0xc2fc20",
+      "size": 32,
+      "name": "_ZN3art18RuntimeArgumentMap25JITInvokeTransitionWeightE"
+    },
+    {
+      "offset": "0x6ad1f0",
+      "size": 924,
+      "name": "_ZN3art8verifier12VerifierDeps29MaybeRecordVerificationStatusEPS1_RKNS_7DexFileERKNS_3dex8ClassDefENS0_11FailureKindE"
+    },
+    {
+      "offset": "0x2cb210",
+      "size": 144,
+      "name": "_ZN3art16RuntimeCallbacks16BeginDefineClassEv"
+    },
+    {
+      "offset": "0x90e180",
+      "size": 180,
+      "name": "_ZNK3art7Runtime21IsAsyncDeoptimizeableEPNS_9ArtMethodEm"
+    },
+    {
+      "offset": "0x7a1010",
+      "size": 16,
+      "name": "_ZN3art9ArtMethod11SetCodeItemEPKNS_3dex8CodeItemEb"
+    },
+    {
+      "offset": "0x4de7a0",
+      "size": 824,
+      "name": "_ZN3art11ClassLinker21AppendToBootClassPathEPKNS_7DexFileENS_6ObjPtrINS_6mirror8DexCacheEEE"
+    },
+    {
+      "offset": "0x3d3d20",
+      "size": 1672,
+      "name": "_ZN3art11ClassLinker17EnsureInitializedEPNS_6ThreadENS_6HandleINS_6mirror5ClassEEEbb"
+    },
+    {
+      "offset": "0x3782b0",
+      "size": 100,
+      "name": "_ZN3art11ClassLinker22FindIncompatibleMethodENS_6ObjPtrINS_6mirror5ClassEEENS1_INS2_8DexCacheEEENS1_INS2_11ClassLoaderEEEj"
+    },
+    {
+      "offset": "0x7a6750",
+      "size": 20,
+      "name": "_ZN3art11ClassLinker26FindClassInSharedLibrariesEPNS_6ThreadEPKcmNS_6HandleINS_6mirror11ClassLoaderEEEPNS_6ObjPtrINS6_5ClassEEE"
+    },
+    {
+      "offset": "0x4a86c0",
+      "size": 2364,
+      "name": "_ZN3art11ClassLinker26CreateWellKnownClassLoaderEPNS_6ThreadERKNSt3__16vectorIPKNS_7DexFileENS3_9allocatorIS7_EEEENS_6HandleINS_6mirror5ClassEEENSD_INSE_11ClassLoaderEEENSD_INSE_11ObjectArrayISH_EEEESL_"
+    },
+    {
+      "offset": "0x4dca90",
+      "size": 176,
+      "name": "_ZN3art7Runtime19SetCalleeSaveMethodEPNS_9ArtMethodENS_14CalleeSaveTypeE"
+    },
+    {
+      "offset": "0x384010",
+      "size": 192,
+      "name": "_ZN3art3jit12JitCodeCache21LookupOsrMethodHeaderEPNS_9ArtMethodE"
+    },
+    {
+      "offset": "0x37a830",
+      "size": 180,
+      "name": "_ZN3art9ArtMethod13GetInvokeTypeEv"
+    },
+    {
+      "offset": "0x7a6820",
+      "size": 1004,
+      "name": "_ZN3art11ClassLinker16CreateArrayClassEPNS_6ThreadEPKcmNS_6HandleINS_6mirror11ClassLoaderEEE"
+    },
+    {
+      "offset": "0x7af240",
+      "size": 156,
+      "name": "_ZN3art11ClassLinker30ResolveMethodWithoutInvokeTypeEjNS_6HandleINS_6mirror8DexCacheEEENS1_INS2_11ClassLoaderEEE"
+    },
+    {
+      "offset": "0x5a5bc0",
+      "size": 272,
+      "name": "_ZN3art11ClassLinker13AllocDexCacheEPNS_6ThreadERKNS_7DexFileE"
+    },
+    {
+      "offset": "0x5ba9e0",
+      "size": 1268,
+      "name": "_ZN3art11ClassLinker35FindClassInBootClassLoaderClassPathEPNS_6ThreadEPKcmPNS_6ObjPtrINS_6mirror5ClassEEE"
+    },
+    {
+      "offset": "0x8b6d80",
+      "size": 72,
+      "name": "_ZN3art6mirror5Class17GetMethodIdOffsetEPNS_9ArtMethodENS_11PointerSizeE"
+    },
+    {
+      "offset": "0x4deea0",
+      "size": 2984,
+      "name": "_ZN3art11ClassLinker21RegisterDexFileLockedERKNS_7DexFileENS_6ObjPtrINS_6mirror8DexCacheEEENS4_INS5_11ClassLoaderEEE"
+    },
+    {
+      "offset": "0x470730",
+      "size": 632,
+      "name": "_ZN3art16WellKnownClasses25StringInitToStringFactoryEPNS_9ArtMethodE"
+    },
+    {
+      "offset": "0x93bd80",
+      "size": 812,
+      "name": "_ZN3art8verifier14MethodVerifier25CalculateVerificationInfoEPNS_6ThreadEPNS_9ArtMethodENS_6HandleINS_6mirror8DexCacheEEENS6_INS7_11ClassLoaderEEEj"
+    },
+    {
+      "offset": "0x7a6770",
+      "size": 168,
+      "name": "_ZN3art11ClassLinker18FindPrimitiveClassEc"
+    },
+    {
+      "offset": "0x4964a0",
+      "size": 1884,
+      "name": "_ZN3art11ClassLinker35GetHoldingClassLoaderOfCopiedMethodEPNS_6ThreadEPNS_9ArtMethodE"
+    },
+    {
+      "offset": "0x7bbc70",
+      "size": 112,
+      "name": "_ZN3art11annotations31GetSignatureAnnotationForMethodEPNS_9ArtMethodE"
+    },
+    {
+      "offset": "0x7a7320",
+      "size": 220,
+      "name": "_ZN3art11ClassLinker25WriteBarrierOnClassLoaderEPNS_6ThreadENS_6ObjPtrINS_6mirror11ClassLoaderEEENS3_INS4_6ObjectEEE"
+    },
+    {
+      "offset": "0x661020",
+      "size": 2096,
+      "name": "_ZN3art15instrumentation15Instrumentation16GetCodeForInvokeEPNS_9ArtMethodE"
+    },
+    {
+      "offset": "0x340da0",
+      "size": 536,
+      "name": "_ZN3art9ArtMethod6InvokeEPNS_6ThreadEPjjPNS_6JValueEPKc"
+    },
+    {
+      "offset": "0x8e38a0",
+      "size": 16,
+      "name": "_ZNK3art10OatDexFile17GetOatClassOffsetEt"
+    },
+    {
+      "offset": "0x93ae30",
+      "size": 24,
+      "name": "_ZN3art8VdexFile14VdexFileHeaderC1Eb"
+    },
+    {
+      "offset": "0x205080",
+      "size": 864,
+      "name": "_ZN3art9ArtMethod19GetObsoleteDexCacheILNS_17ReadBarrierOptionE1EEENS_6ObjPtrINS_6mirror8DexCacheEEEv"
+    },
+    {
+      "offset": "0x282140",
+      "size": 212,
+      "name": "_ZN3art11ClassLinker20FindResolvedFieldJLSENS_6ObjPtrINS_6mirror5ClassEEENS1_INS2_8DexCacheEEENS1_INS2_11ClassLoaderEEEj"
+    },
+    {
+      "offset": "0x5d8890",
+      "size": 828,
+      "name": "_ZN3art11ClassLinker24ThrowEarlierClassFailureENS_6ObjPtrINS_6mirror5ClassEEEbb"
+    },
+    {
+      "offset": "0x7b05f0",
+      "size": 3168,
+      "name": "_ZN3art11ClassLinker14DumpForSigQuitERNSt3__113basic_ostreamIcNS1_11char_traitsIcEEEE"
+    },
+    {
+      "offset": "0x7a0db0",
+      "size": 136,
+      "name": "_ZN3art9ArtMethod18HasAnyCompiledCodeEv"
+    },
+    {
+      "offset": "0x7bbe70",
+      "size": 356,
+      "name": "_ZN3art11annotations20MethodIsNeverCompileERKNS_7DexFileERKNS_3dex8ClassDefEj"
+    },
+    {
+      "offset": "0x2049c0",
+      "size": 1720,
+      "name": "_ZN3art11ClassLinker20DoLookupResolvedTypeENS_3dex9TypeIndexENS_6ObjPtrINS_6mirror8DexCacheEEENS3_INS4_11ClassLoaderEEE"
+    },
+    {
+      "offset": "0x56c4b0",
+      "size": 488,
+      "name": "_ZN3art8verifier12VerifierDepsC2ERKNSt3__16vectorIPKNS_7DexFileENS2_9allocatorIS6_EEEEb"
+    },
+    {
+      "offset": "0x588bc0",
+      "size": 1396,
+      "name": "_ZN3art11interpreter16UnstartedRuntime10InitializeEv"
+    },
+    {
+      "offset": "0x5a5090",
+      "size": 160,
+      "name": "_ZN3art11ClassLinker28InsertDexFileInToClassLoaderENS_6ObjPtrINS_6mirror6ObjectEEENS1_INS2_11ClassLoaderEEE"
+    },
+    {
+      "offset": "0x91f200",
+      "size": 416,
+      "name": "_ZN3art6Thread31FindOrCreateDebuggerShadowFrameEmjPNS_9ArtMethodEj"
+    },
+    {
+      "offset": "0x25dcd0",
+      "size": 560,
+      "name": "_ZN3art16WellKnownClasses22StringInitToEntryPointEPNS_9ArtMethodE"
+    },
+    {
+      "offset": "0x7a97f0",
+      "size": 328,
+      "name": "_ZN3art11ClassLinker11LinkMethodsEPNS_6ThreadENS_6HandleINS_6mirror5ClassEEENS3_INS4_11ObjectArrayIS5_EEEEPbPPNS_9ArtMethodE"
+    },
+    {
+      "offset": "0x7b0560",
+      "size": 28,
+      "name": "_ZNK3art11ClassLinker21IsQuickResolutionStubEPKv"
+    },
+    {
+      "offset": "0x55e450",
+      "size": 572,
+      "name": "_ZN3art11ClassLinker19IsDexFileRegisteredEPNS_6ThreadERKNS_7DexFileE"
+    },
+    {
+      "offset": "0x570170",
+      "size": 344,
+      "name": "_ZN3art11ClassLinker32FindClassInSharedLibrariesHelperEPNS_6ThreadEPKcmNS_6HandleINS_6mirror11ClassLoaderEEEPNS_8ArtFieldEPNS_6ObjPtrINS6_5ClassEEE"
+    },
+    {
+      "offset": "0x825c90",
+      "size": 48,
+      "name": "_ZN3art3jit3Jit27EnqueueOptimizedCompilationEPNS_9ArtMethodEPNS_6ThreadE"
+    }
+  ]
+}

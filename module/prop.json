@@ -1,0 +1,7 @@
+{
+  "name": "FART-Lite for LOS21",
+  "version": "v1.0.0",
+  "versionCode": 1,
+  "author": "fart-los21",
+  "description": "FART-lite: DexFile dumper for LineageOS 21 / Android 14 (arm64, APatch)"
+}

@@ -1,0 +1,4 @@
+# FART-LOS21 SELinux rules
+# 允许 app 进程写入 /data/local/tmp/fart
+allow untrusted_app tmpfs:file create_file_perms
+allow untrusted_app tmpfs:dir create_dir_perms
