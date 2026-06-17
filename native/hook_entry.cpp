@@ -210,6 +210,27 @@ void ArtMethodInvokeHook(void* art_method, void* thread, void* args,
         if (!skip) {
           LOGI("Method: class_ref=0x%x dex_idx=%u flags=0x%x",
                class_ref, dex_idx, access_flags);
+
+          // Stage 2.3: Read CodeItem metadata from ptr_sized_fields_.data_ (offset 0x10)
+          // At runtime, data_ is a direct CodeItem* pointer (bit 0 may be a flag)
+          uintptr_t data_ptr = *(const uintptr_t*)(m + 0x10);
+          const uint8_t* ci = (const uint8_t*)(data_ptr & ~1ULL);
+          if (ci != nullptr && IsRangeReadable(ci, 16)) {
+            uint16_t regs  = *(const uint16_t*)(ci + 0);
+            uint16_t ins   = *(const uint16_t*)(ci + 2);
+            uint16_t outs  = *(const uint16_t*)(ci + 4);
+            uint16_t tries = *(const uint16_t*)(ci + 6);
+            // Skip debug_info_off at +8 (4 bytes)
+            uint32_t insns = *(const uint32_t*)(ci + 12);
+            if (insns > 0 && insns < 65536) {
+              LOGI("CodeItem: regs=%u ins=%u outs=%u tries=%u insns=%u ptr=%p",
+                   regs, ins, outs, tries, insns, ci);
+            } else {
+              LOGI("CodeItem: invalid insns=%u (data_ptr=0x%zx)", insns, data_ptr);
+            }
+          } else {
+            LOGI("CodeItem: null or not readable (data_ptr=0x%zx)", data_ptr);
+          }
         }
       }
     }
