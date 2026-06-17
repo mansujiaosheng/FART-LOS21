@@ -9,6 +9,9 @@
 - 在目标 app 启动时，通过 ZygiskNext 注入到 app 进程
 - Hook ART 的 `ClassLinker::DefineClass` 函数 (被动 DexFile dump)
 - 可选 Hook ART 的 `ArtMethod::Invoke` 函数 (反射/JNI 方法调用入口)
+- 可选 JNI 主动反射触发框架 (active invoke, 后台线程调用 Method.invoke())
+- 可选 skip-execute 模式 (只 dump 不执行方法体)
+- 被动 CodeItem dump + PC 端 dex repair (修复 stripped 方法)
 - 在类加载时提取 DexFile 的原始字节并写入磁盘
 - 支持 allowlist / blacklist 包名过滤
 - 支持禁用模块后恢复系统原状
@@ -28,17 +31,32 @@ dlopen libfart-hook.so
   ↓
 fart_on_app_specialize(JNIEnv*, package_name, module_dir)
   ↓
+解析 config → 获取输出目录 (app files dir 或 /data/local/tmp/fart_dump)
+  ↓
 SetupHooks():
   ├── resolve DefineClass → Arm64InlineHook (DefineClassHook)
   └── [条件] resolve ArtMethod::Invoke → Arm64InlineHook (ArtMethodInvokeHook)
   ↓
 DumpAlreadyLoadedDex(): Java反射枚举 DexFile
   ↓
-DefineClassHook 回调: DexFile+8 读取 begin_ → IsRangeReadable 验证
+[条件] ActiveInvokeEngine::Start() → Java Thread 或 pthread
+  └── 延迟后 → Class.forName + getDeclaredMethods
+      └── filter static no-arg → Method.invoke() ← 触发 ArtMethod::Invoke Hook
+          └── [skip_execute=true] JValue 填充 → return (不执行原方法)
   ↓
-同步写文件 → /data/local/tmp/fart_dump/dex_*.dex
+DefineClassHook 回调: DexFile+8 读取 begin_ → 去重 (begin_ addr set)
   ↓
-[条件] ArtMethodInvokeHook 回调: 采样日志 + 字段解析
+同步写文件 → dex_<pid>_<tid>.dex
+  ↓
+ArtMethodInvokeHook 回调:
+  ├── Stage 2.1: 采样计数 + Invoke #日志
+  ├── Stage 2.2: 字段解析 (declaring_class, dex_idx, flags)
+  ├── Stage 2.3: CodeItem metadata (regs, ins, outs, tries, insns)
+  └── Stage 2.4: CodeItem dump (QueueDump → Worker → .json + .code)
+
+PC 端:
+  scripts/dex_repair.py: dump.dex + methods/ → repaired.dex + repair_report.json
+  scripts/dex_structs.py: ULEB128/SLEB128, DEX 结构体
 ```
 
 ---
@@ -1088,6 +1106,84 @@ $ADB logcat | grep 'Found DefineClass'
 
 ---
 
+### 坑 13: ArtMethod::Invoke sample_rate=1 时采样日志永远不输出
+
+**现象**：`g_invoke_count % sample_rate == 1` 在 `sample_rate=1` 时，`count=1, 1%1=0 != 1` → 永远不匹配。
+
+**修复**：改为 `g_invoke_count % rate == 0`。
+
+**教训**：采样率条件必须同时测试 `rate=1` 的边界情况。
+
+---
+
+### 坑 14: active_invoke 后台线程 AttachCurrentThread 阻塞主线程
+
+**现象**：pthread_create + AttachCurrentThread 在 app 启动早期获取 mutator_lock 时，与主线程的 DefineClass (也持有 mutator_lock) 形成竞争 → app 卡死。
+
+**分析**：看 `art/runtime/jni/java_vm_ext.cc:458-491`：
+```cpp
+if (runtime->IsZygote()) { return JNI_ERR; }
+Thread* self = Thread::Current();
+if (self != nullptr) { *p_env = self->GetJniEnv(); return JNI_OK; }
+// ...
+if (!runtime->AttachCurrentThread(...)) { ... }
+```
+新线程的 `AttachCurrentThread` 需要等待 GC 安全点，而主线程在类加载期间不会进入安全点。
+
+**解决**：
+1. 将 `usleep(delay_ms * 1000)` 移到 `AttachCurrentThread` 之前 (延迟 3-5 秒让主线程完成初始化)
+2. 更彻底的方案: 通过 JNI 创建 Java Thread (InMemoryDexClassLoader + RegisterNatives)，Java 线程天然拥有 JNIEnv，不需要 AttachCurrentThread
+
+---
+
+### 坑 15: SELinux 阻止非 debuggable app 写文件
+
+**现象**：com.funshion.video.mobile (非 debuggable) 的 DefineClass dump 输出 "cannot open" 错误。
+
+**分析**：`/data/local/tmp/fart_dump/` 目录的 SELinux context 为 `shell_data_file:s0`，app 进程 (untrusted_app) 无法写入。
+
+**解决**：
+1. 目录创建时 `chmod 0777 + chcon u:object_r:app_data_file:s0`
+2. 目录必须有 `x` 权限 (可遍历)，否则 mkdir/open 子目录/文件返回 EACCES(13)
+3. 更好的方案: 使用 app 私有目录 `/data/data/<pkg>/files/fart/` (通过 `ActivityThread.currentApplication().getFilesDir()` 获取)
+4. 注意: `currentApplication()` 在 `postAppSpecialize` 时机可能返回 null，需要 fallback
+
+---
+
+### 坑 16: DefineClass dump 同一 dex 被重复 dump 数百次
+
+**现象**：每个 class 的 DefineClass 都写一次文件，同一个 dex (begin_ 指针相同) 被 dump 几百次。
+
+**解决**：用 `std::unordered_set<uintptr_t>` 记录已 dump 的 `begin_` 地址，写前检查。
+
+**效果**：447 个重复文件 → 6 个唯一 dex。
+
+---
+
+### 坑 17: InMemoryDexClassLoader 的 goto 语法限制
+
+**现象**：`goto` 跳转跨越了 C++ 变量的声明 (如 `jclass byte_buffer_cls`)，编译报错 "jump bypasses variable initialization"。
+
+**解决**：将 Java Thread 启动逻辑提取为独立的 `TryStartJavaThread()` 方法，使用 `return` 替代 `goto`。
+
+---
+
+### 坑 18: `jvalue` 不是 `JValue`
+
+**现象**：使用 `JValue` (大写) 编译报错 undefined。NDK 的 `<jni.h>` 中定义的是 `jvalue` (小写，`typedef union jvalue`)。
+
+**解决**：使用 `jvalue` + JNI 类型 (`jboolean`, `jint`, `jlong` 等)
+
+---
+
+### 坑 19: Java Thread 创建时序
+
+**现象**：通过 `InMemoryDexClassLoader` 加载 helper DEX + `RegisterNatives` + `new Thread().start()` 需要在 app 进程初始化的早期完成，但 InMemoryDexClassLoader 需要 app 的 classloader 作为 parent。
+
+**解决**：通过 `ActivityThread.currentActivityThread().getApplication().getClassLoader()` 获取 app 的 classloader。需要在进入 worker 线程前完成，因为新线程没有 app 的 context classloader。
+
+---
+
 ### 坑 12: loader 和 test module 行为不一致
 
 **现象**：最小测试模块（`class TestModule`）能正常触发 `preAppSpecialize/postAppSpecialize`，但完整 FART loader（`class FartLoader`）不行。两个模块使用相同的 `REGISTER_ZYGISK_MODULE` 宏和编译参数。
@@ -1116,3 +1212,14 @@ $ADB logcat | grep 'Found DefineClass'
 | 9 | Phase 2: enable_artmethod_hook=true 后 Hook 安装成功、app 不崩溃 | ✅ |
 | 10 | Phase 2: 字段解析 (class_ref + dex_idx + flags) + 过滤 native/abstract/runtime | ✅ |
 | 11 | Phase 2: 4 个 Git 分支已推送到 GitHub | ✅ |
+| 12 | Stage 2.4: CodeItem dump 框架 (QueueDump + Worker + .json/.code) | ✅ |
+| 13 | Stage 2.4: 去重 (sha256_prefix + method_idx) + max 限制 | ✅ |
+| 14 | Stage 2.4: tries>0 标记 dump_complete=false | ✅ |
+| 15 | Stage 2.4: source 字段区分 active_invoke / ArtMethodInvoke | ✅ |
+| 16 | Stage 2.5: active_invoke 引擎 (Java Thread + pthread 回退) | ✅ |
+| 17 | Stage 2.5: PathClassLoader 加载 + getDeclaredMethods + 过滤 | ✅ |
+| 18 | Stage 2.5: skip_execute 模式 (JValue 填充 + 跳过原函数) | ✅ |
+| 19 | Stage 2.6: PC 端 dex_repair.py (ULEB128 + append CodeItem + checksum) | ✅ |
+| 20 | 风行视频 非 debuggable app DefineClass dump 验证 (44777 方法体) | ✅ |
+| 21 | 输出目录 SELinux 修复 (chmod 777 + app_data_file) | ✅ |
+| 22 | DefineClass 去重 (begin_ addr set, 447→6) | ✅ |

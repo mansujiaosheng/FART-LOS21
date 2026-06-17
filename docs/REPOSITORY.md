@@ -8,12 +8,33 @@ fart-los21/                          ← 项目根目录
 ├── config/                           ← 运行时配置文件
 ├── native/                           ← native 代码 + 编译系统
 │   ├── include/                      ← 所有头文件
+│   │   ├── config.h
+│   │   ├── codeitem_dump.h
+│   │   ├── active_invoke.h
+│   │   ├── helper_dex.h             ← 嵌入的 Java helper DEX 数据
+│   │   └── ...
 │   ├── Makefile                      ← NDK 交叉编译
-│   └── *.cpp / *.c                   ← 源文件
-├── scripts/                          ← 管理脚本
+│   ├── hook_entry.cpp               ← Hook 核心 (DefineClass + ArtMethod::Invoke)
+│   ├── config.cpp                    ← JSON 解析
+│   ├── art_resolver.cpp             ← ART 符号解析
+│   ├── dex_dump.cpp                  ← DEX 写入
+│   ├── codeitem_dump.cpp            ← Stage 2.4: CodeItem dump worker
+│   ├── active_invoke.cpp            ← Stage 2.5: 主动调用引擎
+│   ├── zygisk_loader.cpp            ← Zygisk 入口 (无 STL)
+│   ├── helper/                      ← Java helper 源码
+│   │   └── com/fartlos21/helper/FartBridge.java
+│   └── injector.c                   ← 已废弃
+├── scripts/                          ← 管理脚本 + PC 端工具
+│   ├── dex_structs.py               ← Stage 2.6: DEX 结构 + ULEB128
+│   ├── dex_repair.py                ← Stage 2.6: dex 修复器
+│   └── ...
 ├── docs/                             ← 文档
-├── libart_device.so                  ← 从设备拉取的 libart.so (用于符号分析)
+│   ├── TECHNICAL.md                 ← 技术参考 + 坑记录
+│   ├── REPOSITORY.md                ← 仓库结构
+│   └── stage2.4-quality-report.md
+├── libart_device.so                  ← 从设备拉取的 libart.so
 ├── art_symbol_analysis.json          ← libart 符号分析结果
+├── fxsp_dump/                        ← 风行视频脱壳数据 (6 dex)
 └── fart-los21-module.zip             ← 打包好的模块 zip
 ```
 
@@ -137,21 +158,21 @@ make test
 
 **职责**:
 1. `fart_on_app_specialize()` — 显式初始化入口 (由 loader 通过 dlsym 调用)
-2. `SetupHooks()` — 解析 DefineClass 地址, 安装 ARM64 inline hook; 条件安装 ArtMethod::Invoke hook
-3. `DefineClassHook()` — DefineClass 回调函数:
-   - 调用原始 DefineClass 让类正常加载
-   - 从 DexFile 对象读取 `begin_` 字段 (offset 8)
-   - 验证 dex magic
-   - 检查内存可读性 (解析 /proc/self/maps)
-   - 同步写入 dex 文件
-4. `ArtMethodInvokeHook()` — ArtMethod::Invoke 回调函数 (Phase 2):
-   - thread_local reentry guard 防止递归
-   - 调用原始 Invoke 让方法正常执行
-   - 采样日志 (按 sample_rate 间隔打印 method 指针)
-   - 字段解析 (declaring_class, dex_method_index, access_flags)
-5. `DumpAlreadyLoadedDex()` — 通过 Java 反射枚举已加载的 dex 文件, 补充 dump
-6. `IsRangeReadable()` — 内存可读性验证
-7. `CrashHandler()` — SIGSEGV 信号处理器 (同时清理 DefineClass + ArtMethod 两个 hook)
+   - 解析配置 + 获取 app files dir (SELinux 安全输出路径)
+   - 调用 SetupHooks() + DumpAlreadyLoadedDex()
+   - 条件启动 ActiveInvokeEngine
+2. `SetupHooks()` — 解析 DefineClass + ArtMethod::Invoke 地址, 安装 ARM64 inline hook
+3. `DefineClassHook()` — DefineClass 回调:
+   - 读取 DexFile.begin_ → 验证 dex magic → 去重 (begin_ addr set) → 写文件
+4. `ArtMethodInvokeHook()` — ArtMethod::Invoke 回调:
+   - Stage 2.1: 采样计数 + 日志
+   - Stage 2.2: 字段解析 (declaring_class, dex_method_index, access_flags)
+   - Stage 2.3: CodeItem metadata (regs, ins, outs, tries, insns)
+   - Stage 2.4: CodeItem dump (QueueDump → 异步写入)
+   - Phase 2: skip_execute 检测 + JValue 填充 (主动调用跳过执行)
+5. `DumpAlreadyLoadedDex()` — Java 反射枚举已加载 dex
+6. `IsRangeReadable()` — 内存可读性验证 (/proc/self/maps)
+7. `CrashHandler()` — SIGSEGV 信号处理器 (清理所有 hook)
 
 **关键架构决策**:
 - constructor 仅打日志, 不做任何初始化
