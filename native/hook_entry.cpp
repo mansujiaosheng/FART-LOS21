@@ -136,10 +136,11 @@ void* DefineClassHook(void* class_linker, void* thread, const char* descriptor,
 
   LOGI("Dex: begin=%p size=%u", begin, dex_size);
 
-  // Deep copy and write synchronously (to /data/local/tmp/ for SELinux compatibility)
+  // Deep copy and write synchronously
   pid_t pid = getpid();
   char filename[512];
-  snprintf(filename, sizeof(filename), "/data/local/tmp/fart_dump/dex_%d_%d.dex",
+  snprintf(filename, sizeof(filename), "%s/dex_%d_%d.dex",
+           g_config.dump_dir.c_str(),
            pid, (int)syscall(__NR_gettid));
 
   // Read into stack/local buffer first (validate), then write
@@ -503,7 +504,7 @@ static bool SetupHooks() {
 
   // Stage 2.4: Init CodeItem dumper (only when enabled)
   if (g_config.enable_codeitem_dump && g_config.enable_artmethod_hook) {
-    std::string codeitem_dir = g_config.dump_dir + "_dump";
+    std::string codeitem_dir = g_config.dump_dir;
     g_codeitem_dumper = new CodeItemDumper();
     if (!g_codeitem_dumper->Init(codeitem_dir.c_str(), g_config.max_codeitem_dumps)) {
       LOGE("CodeItemDumper init failed");
@@ -540,6 +541,58 @@ void fart_on_app_specialize(JNIEnv* env, const char* package_name, const char* m
   }
 
   if (!g_config.enable) { LOGI("disabled by config"); return; }
+
+  // Phase 1A: Try to get app files dir for output (SELinux-safe)
+  {
+    jclass at_cls = env->FindClass("android/app/ActivityThread");
+    if (at_cls != nullptr) {
+      jmethodID cur_app_mid = env->GetStaticMethodID(at_cls, "currentApplication",
+                                                       "()Landroid/app/Application;");
+      if (cur_app_mid != nullptr) {
+        jobject app = env->CallStaticObjectMethod(at_cls, cur_app_mid);
+        if (app != nullptr && !env->ExceptionCheck()) {
+          jclass app_cls = env->GetObjectClass(app);
+          jmethodID get_files_mid = env->GetMethodID(app_cls, "getFilesDir",
+                                                       "()Ljava/io/File;");
+          if (get_files_mid != nullptr) {
+            jobject files_dir = env->CallObjectMethod(app, get_files_mid);
+            if (files_dir != nullptr && !env->ExceptionCheck()) {
+              // Get path string from File object
+              jclass file_cls = env->GetObjectClass(files_dir);
+              jmethodID get_path_mid = env->GetMethodID(file_cls, "getPath",
+                                                         "()Ljava/lang/String;");
+              jstring path_str = (jstring)env->CallObjectMethod(files_dir, get_path_mid);
+              if (path_str != nullptr) {
+                const char* path_chars = env->GetStringUTFChars(path_str, nullptr);
+                if (path_chars != nullptr) {
+                  char new_dump_dir[512];
+                  snprintf(new_dump_dir, sizeof(new_dump_dir), "%s/fart", path_chars);
+                  g_config.dump_dir = std::string(new_dump_dir);
+                  LOGI("app files dir: %s", new_dump_dir);
+                  env->ReleaseStringUTFChars(path_str, path_chars);
+                }
+                env->DeleteLocalRef(path_str);
+              }
+              env->DeleteLocalRef(file_cls);
+              env->DeleteLocalRef(files_dir);
+            }
+          }
+          env->DeleteLocalRef(app_cls);
+          env->DeleteLocalRef(app);
+        }
+      }
+      env->DeleteLocalRef(at_cls);
+    }
+    if (env->ExceptionCheck()) env->ExceptionClear();
+    // If app files dir not available, fallback with proper perms
+    if (g_config.dump_dir == "/data/local/tmp/fart" ||
+        g_config.dump_dir.find("/data/local/tmp/fart") == 0) {
+      mkdir("/data/local/tmp/fart_dump", 0777);
+      chmod("/data/local/tmp/fart_dump", 0777);
+      g_config.dump_dir = "/data/local/tmp/fart_dump";
+      LOGI("fallback dump dir: %s", g_config.dump_dir.c_str());
+    }
+  }
 
   // Setup hooks
   if (SetupHooks()) {
