@@ -34,7 +34,7 @@ fart-los21/                          ← 项目根目录
 
 | 文件 | 用途 |
 |------|------|
-| `config.json` | 模块运行时配置: enable, packages (allowlist), blacklist_packages, dump_dir, dump_dex, dump_code_item, active_invoke |
+| `config.json` | 模块运行时配置: enable, packages (allowlist), blacklist_packages, dump_dir, dump_dex, dump_code_item, active_invoke, enable_artmethod_hook, artmethod_sample_rate |
 
 **配置格式**:
 ```json
@@ -49,7 +49,9 @@ fart-los21/                          ← 项目根目录
     "dump_dir": "/data/local/tmp/fart",
     "dump_dex": true,
     "dump_code_item": false,
-    "active_invoke": false
+    "active_invoke": false,
+    "enable_artmethod_hook": false,
+    "artmethod_sample_rate": 1000
 }
 ```
 
@@ -135,16 +137,21 @@ make test
 
 **职责**:
 1. `fart_on_app_specialize()` — 显式初始化入口 (由 loader 通过 dlsym 调用)
-2. `SetupHooks()` — 解析 DefineClass 地址, 安装 ARM64 inline hook
+2. `SetupHooks()` — 解析 DefineClass 地址, 安装 ARM64 inline hook; 条件安装 ArtMethod::Invoke hook
 3. `DefineClassHook()` — DefineClass 回调函数:
    - 调用原始 DefineClass 让类正常加载
    - 从 DexFile 对象读取 `begin_` 字段 (offset 8)
    - 验证 dex magic
    - 检查内存可读性 (解析 /proc/self/maps)
    - 同步写入 dex 文件
-4. `DumpAlreadyLoadedDex()` — 通过 Java 反射枚举已加载的 dex 文件, 补充 dump
-5. `IsRangeReadable()` — 内存可读性验证
-6. `CrashHandler()` — SIGSEGV 信号处理器
+4. `ArtMethodInvokeHook()` — ArtMethod::Invoke 回调函数 (Phase 2):
+   - thread_local reentry guard 防止递归
+   - 调用原始 Invoke 让方法正常执行
+   - 采样日志 (按 sample_rate 间隔打印 method 指针)
+   - 字段解析 (declaring_class, dex_method_index, access_flags)
+5. `DumpAlreadyLoadedDex()` — 通过 Java 反射枚举已加载的 dex 文件, 补充 dump
+6. `IsRangeReadable()` — 内存可读性验证
+7. `CrashHandler()` — SIGSEGV 信号处理器 (同时清理 DefineClass + ArtMethod 两个 hook)
 
 **关键架构决策**:
 - constructor 仅打日志, 不做任何初始化
@@ -162,7 +169,7 @@ make test
 - `json_read_string()` — 解析字符串值
 - `json_read_array()` — 解析 `"packages": ["pkg1", "pkg2"]` 数组
 
-**支持的字段**: enable, packages, blacklist_packages, dump_dir, dump_dex, dump_code_item, active_invoke
+**支持的字段**: enable, packages, blacklist_packages, dump_dir, dump_dex, dump_code_item, active_invoke, enable_artmethod_hook, artmethod_sample_rate
 
 ---
 
@@ -292,6 +299,7 @@ make test
 4. **三级安全保护**: loader hard allowlist → config allowlist → hook constructor 安全检查
 5. **可回滚**: 任何模块修改通过 `disable` 标记即可恢复
 6. **不修改系统**: 所有文件在 `/data/adb/modules/` 或 `/data/local/tmp/`, 不碰 system 分区
+7. **ArtMethod 钩子线程安全**: ArtMethod::Invoke 是高频率函数, 使用 thread_local reentry guard 防止递归, 按 sample_rate 采样避免性能损耗
 
 ---
 

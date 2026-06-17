@@ -11,5 +11,7 @@
   "dump_code_item": false,
   "active_invoke": false,
   "enable_artmethod_hook": false,
-  "artmethod_sample_rate": 1000
+  "artmethod_sample_rate": 1000,
+  "enable_codeitem_dump": false,
+  "max_codeitem_dumps": 500
 }

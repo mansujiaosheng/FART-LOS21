@@ -5,6 +5,7 @@
 #include "art_resolver.h"
 #include "dex_dump.h"
 #include "arm64_hook.h"
+#include "codeitem_dump.h"
 
 #include <cstdio>
 #include <cstring>
@@ -44,6 +45,9 @@ static Arm64InlineHook* g_define_hook = nullptr;
 static Arm64InlineHook* g_artmethod_hook = nullptr;
 static void* g_artmethod_invoke_orig = nullptr;
 static std::atomic<bool> g_artmethod_hook_active{false};
+
+// Stage 2.4: CodeItem dump worker
+static CodeItemDumper* g_codeitem_dumper = nullptr;
 
 // Crash handlers
 static struct sigaction old_sigsegv;
@@ -183,6 +187,89 @@ void ArtMethodInvokeHook(void* art_method, void* thread, void* args,
     if (g_invoke_count % rate == 1) {
       LOGI("Invoke #%lu: method=%p tid=%d",
            g_invoke_count, art_method, (int)syscall(__NR_gettid));
+
+      // Stage 2.2: Parse ArtMethod fields
+      uintptr_t m = (uintptr_t)art_method & 0x00FFFFFFFFFFFFFFULL;
+      if (m != 0 && IsRangeReadable((void*)m, 0x20)) {
+        // ArtMethod field offsets (Android 14 / LOS21, ARM64):
+        //   0x00: declaring_class_ (GcRoot<Class>, 4 bytes compressed ref)
+        //   0x04: access_flags_ (std::atomic<uint32_t>, 4 bytes)
+        //   0x08: dex_method_index_ (uint32_t, 4 bytes)
+        //   0x0C: method_index_ (uint16_t, 2 bytes)
+        //   0x0E: hotness_count_ (uint16_t, 2 bytes)
+        //   0x10: ptr_sized_fields_.data_ (void*, 8 bytes)
+        //   0x18: entry_point_from_quick_compiled_code_ (void*, 8 bytes)
+
+        uint32_t class_ref = *(const uint32_t*)(m + 0x00);
+        uint32_t access_flags = *(const uint32_t*)(m + 0x04);
+        uint32_t dex_idx = *(const uint32_t*)(m + 0x08);
+
+        // Filter: skip uninitialized, runtime methods, native, abstract
+        bool skip = false;
+        if (class_ref == 0) skip = true;
+        if (dex_idx == 0xFFFFFFFF) skip = true;  // kRuntimeMethodDexMethodIndex
+        if (access_flags & 0x0100) skip = true;  // kAccNative
+        if (access_flags & 0x0400) skip = true;  // kAccAbstract
+
+        if (!skip) {
+          LOGI("Method: class_ref=0x%x dex_idx=%u flags=0x%x",
+               class_ref, dex_idx, access_flags);
+
+          // Stage 2.3: Read CodeItem metadata from ptr_sized_fields_.data_ (offset 0x10)
+          // At runtime, data_ is a direct CodeItem* pointer (bit 0 may be a flag)
+          uintptr_t data_ptr = *(const uintptr_t*)(m + 0x10);
+          const uint8_t* ci = (const uint8_t*)(data_ptr & ~1ULL);
+          if (ci != nullptr && IsRangeReadable(ci, 16)) {
+            uint16_t regs  = *(const uint16_t*)(ci + 0);
+            uint16_t ins   = *(const uint16_t*)(ci + 2);
+            uint16_t outs  = *(const uint16_t*)(ci + 4);
+            uint16_t tries = *(const uint16_t*)(ci + 6);
+            // Skip debug_info_off at +8 (4 bytes)
+            uint32_t insns = *(const uint32_t*)(ci + 12);
+            if (insns > 0 && insns < 65536) {
+              LOGI("CodeItem: regs=%u ins=%u outs=%u tries=%u insns=%u ptr=%p",
+                   regs, ins, outs, tries, insns, ci);
+
+              // Stage 2.4: Passive CodeItem dump (header + insns only)
+              if (g_config.enable_codeitem_dump && g_codeitem_dumper != nullptr) {
+                CodeItemDumpTask citask;
+                citask.pid = getpid();
+                citask.tid = (pid_t)syscall(__NR_gettid);
+                citask.method_idx = dex_idx;
+                citask.registers_size = regs;
+                citask.ins_size = ins;
+                citask.outs_size = outs;
+                citask.tries_size = tries;
+                citask.insns_size = insns;
+                citask.dump_size = 16 + (size_t)insns * 2;
+                citask.dump_complete = (tries == 0);  // true only if no try/catch blocks
+
+                // Sync memcpy to owned buffer (safe copy)
+                if (citask.CopyData(ci, citask.dump_size)) {
+                  int rc = g_codeitem_dumper->QueueDump(citask);
+                  if (rc == 0) {
+                    LOGI("codeitem_dump: queued method_%u (%zu bytes, %s)",
+                         dex_idx, citask.dump_size,
+                         citask.dump_complete ? "complete" : "partial");
+                  } else if (rc == 1) {
+                    LOGI("codeitem_dump: duplicate method_%u", dex_idx);
+                  } else if (rc == 2) {
+                    LOGW("codeitem_dump: max reached, skip method_%u", dex_idx);
+                  } else {
+                    LOGW("codeitem_dump: queue failed for method_%u", dex_idx);
+                  }
+                } else {
+                  LOGW("codeitem_dump: CopyData failed for method_%u", dex_idx);
+                }
+              }
+            } else {
+              LOGI("CodeItem: invalid insns=%u (data_ptr=0x%zx)", insns, data_ptr);
+            }
+          } else {
+            LOGI("CodeItem: null or not readable (data_ptr=0x%zx)", data_ptr);
+          }
+        }
+      }
     }
   }
 
@@ -406,6 +493,19 @@ static bool SetupHooks() {
   LOGI("FART hooks: DefineClass=%s, ArtMethod::Invoke=%s",
        g_hooks_active.load() ? "active" : "off",
        g_artmethod_hook_active.load() ? "active" : "off");
+
+  // Stage 2.4: Init CodeItem dumper (only when enabled)
+  if (g_config.enable_codeitem_dump && g_config.enable_artmethod_hook) {
+    std::string codeitem_dir = g_config.dump_dir + "_dump";
+    g_codeitem_dumper = new CodeItemDumper();
+    if (!g_codeitem_dumper->Init(codeitem_dir.c_str(), g_config.max_codeitem_dumps)) {
+      LOGE("CodeItemDumper init failed");
+      delete g_codeitem_dumper;
+      g_codeitem_dumper = nullptr;
+    } else {
+      LOGI("✅ CodeItem dumper ready (max=%u)", g_config.max_codeitem_dumps);
+    }
+  }
 
   return true;
 }
