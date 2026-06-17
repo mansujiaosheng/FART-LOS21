@@ -24,6 +24,7 @@
 #define LOGW(...) __android_log_print(ANDROID_LOG_WARN, LOG_TAG, __VA_ARGS__)
 
 static thread_local bool g_fart_active_dump = false;
+static thread_local bool g_fart_in_invoke = false;
 static JNIEnv* g_env = nullptr;
 static char g_package[256] = {};
 
@@ -39,6 +40,11 @@ static std::atomic<bool> g_initialized{false};
 static std::atomic<bool> g_hooks_active{false};
 static Arm64InlineHook* g_define_hook = nullptr;
 
+// ArtMethod::Invoke hook (Phase 2)
+static Arm64InlineHook* g_artmethod_hook = nullptr;
+static void* g_artmethod_invoke_orig = nullptr;
+static std::atomic<bool> g_artmethod_hook_active{false};
+
 // Crash handlers
 static struct sigaction old_sigsegv;
 static struct sigaction old_sigbus;
@@ -46,7 +52,9 @@ static struct sigaction old_sigbus;
 static void CrashHandler(int sig, siginfo_t* info, void* context) {
   LOGE("CRASH: signal=%d, addr=%p, disabling hooks", sig, info->si_addr);
   if (g_define_hook) { g_define_hook->Unhook(); delete g_define_hook; g_define_hook = nullptr; }
+  if (g_artmethod_hook) { g_artmethod_hook->Unhook(); delete g_artmethod_hook; g_artmethod_hook = nullptr; }
   g_hooks_active = false;
+  g_artmethod_hook_active = false;
   struct sigaction* old = (sig == SIGSEGV) ? &old_sigsegv : &old_sigbus;
   if (old->sa_sigaction) old->sa_sigaction(sig, info, context);
   else if (old->sa_handler) old->sa_handler(sig);
@@ -152,6 +160,28 @@ void* DefineClassHook(void* class_linker, void* thread, const char* descriptor,
   }
 
   return result;
+}
+
+// ===== ArtMethod::Invoke Hook (Phase 2) =====
+extern "C" __attribute__((used))
+void ArtMethodInvokeHook(void* art_method, void* thread, void* args,
+                          void* args_size_val, void* result, void* shorty) {
+  // Reentry guard: prevent recursion if ArtMethod::Invoke is called
+  // within our own callback (e.g. via LOGI -> android_log_print -> ...)
+  if (g_fart_in_invoke) {
+    goto call_original;
+  }
+  g_fart_in_invoke = true;
+
+  // Nothing else in Stage 2.0 — just call the original
+
+call_original:
+  if (g_artmethod_invoke_orig) {
+    auto orig = reinterpret_cast<void (*)(void*, void*, void*, void*, void*, void*)>(
+        g_artmethod_invoke_orig);
+    orig(art_method, thread, args, args_size_val, result, shorty);
+  }
+  g_fart_in_invoke = false;
 }
 
 // ===== Post-hook snapshot dump via Java reflection =====
@@ -337,6 +367,35 @@ static bool SetupHooks() {
   g_hooks_active = true;
   g_initialized = true;
   LOGI("✅ FART hooks activated (pid=%d)", getpid());
+
+  // Phase 2: ArtMethod::Invoke Hook (conditional)
+  if (g_config.enable_artmethod_hook) {
+    void* invoke_addr = g_resolver->ResolveByOffset(0x340da0);
+    if (!invoke_addr) {
+      invoke_addr = g_resolver->ResolveByName(
+          "_ZN3art9ArtMethod6InvokeEPNS_6ThreadEPjjPNS_6JValueEPKc");
+    }
+    if (invoke_addr) {
+      g_artmethod_hook = new Arm64InlineHook();
+      if (g_artmethod_hook->Hook(invoke_addr, (void*)ArtMethodInvokeHook,
+                                  &g_artmethod_invoke_orig)) {
+        g_artmethod_hook_active = true;
+        LOGI("✅ ArtMethod::Invoke hooked at %p (sample_rate=%u)",
+             invoke_addr, g_config.artmethod_sample_rate);
+      } else {
+        LOGE("ArtMethod::Invoke hook failed");
+        delete g_artmethod_hook;
+        g_artmethod_hook = nullptr;
+      }
+    } else {
+      LOGE("ArtMethod::Invoke NOT FOUND");
+    }
+  }
+
+  LOGI("FART hooks: DefineClass=%s, ArtMethod::Invoke=%s",
+       g_hooks_active.load() ? "active" : "off",
+       g_artmethod_hook_active.load() ? "active" : "off");
+
   return true;
 }
 
