@@ -1,0 +1,15 @@
+# Build artifacts
+FartController/build/
+*.apk
+*.apk.idsig
+*.keystore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
