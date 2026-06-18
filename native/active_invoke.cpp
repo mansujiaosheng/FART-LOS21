@@ -30,7 +30,7 @@ ActiveInvokeEngine::~ActiveInvokeEngine() {
 void ActiveInvokeEngine::Start(JNIEnv* env, const char* package_name,
                                 const std::vector<std::string>& classes,
                                 uint32_t delay_ms, uint32_t max_methods) {
-  if (env == nullptr || package_name == nullptr || classes.empty()) {
+  if (env == nullptr || package_name == nullptr) {
     LOGW("ActiveInvoke: invalid args");
     return;
   }
@@ -51,6 +51,15 @@ void ActiveInvokeEngine::Start(JNIEnv* env, const char* package_name,
 
 void ActiveInvokeEngine::WorkerThread() {
   LOGI("ActiveInvoke: worker thread started");
+
+  // If no classes configured, log a warning and exit
+  if (classes_.empty()) {
+    LOGW("ActiveInvoke: no classes configured, skipping");
+    running_ = false;
+    g_active_invoke_running = 0;
+    java_vm_->DetachCurrentThread();
+    return;
+  }
 
   // Wait for initial delay
   if (delay_ms_ > 0) {
