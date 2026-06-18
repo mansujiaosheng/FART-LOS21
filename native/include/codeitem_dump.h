@@ -32,6 +32,49 @@ struct CodeItemDumpTask {
   CodeItemDumpTask();
   ~CodeItemDumpTask();
 
+  // No copy — raw pointer ownership
+  CodeItemDumpTask(const CodeItemDumpTask&) = delete;
+  CodeItemDumpTask& operator=(const CodeItemDumpTask&) = delete;
+
+  // Move — transfer ownership, source becomes nullptr
+  CodeItemDumpTask(CodeItemDumpTask&& other) noexcept
+      : pid(other.pid),
+        tid(other.tid),
+        method_idx(other.method_idx),
+        registers_size(other.registers_size),
+        ins_size(other.ins_size),
+        outs_size(other.outs_size),
+        tries_size(other.tries_size),
+        insns_size(other.insns_size),
+        dump_size(other.dump_size),
+        dump_complete(other.dump_complete),
+        data(other.data) {
+    memcpy(sha256_prefix, other.sha256_prefix, 17);
+    other.data = nullptr;
+    other.dump_size = 0;
+  }
+
+  CodeItemDumpTask& operator=(CodeItemDumpTask&& other) noexcept {
+    if (this != &other) {
+      delete[] data;
+      pid = other.pid;
+      tid = other.tid;
+      method_idx = other.method_idx;
+      registers_size = other.registers_size;
+      ins_size = other.ins_size;
+      outs_size = other.outs_size;
+      tries_size = other.tries_size;
+      insns_size = other.insns_size;
+      dump_size = other.dump_size;
+      dump_complete = other.dump_complete;
+      data = other.data;
+      memcpy(sha256_prefix, other.sha256_prefix, 17);
+      other.data = nullptr;
+      other.dump_size = 0;
+    }
+    return *this;
+  }
+
   // Copy code_item bytes into owned buffer and compute hash
   bool CopyData(const uint8_t* src, size_t sz);
 };

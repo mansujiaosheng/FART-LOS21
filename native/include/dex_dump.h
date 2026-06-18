@@ -23,6 +23,43 @@ struct DexDumpTask {
   uint8_t sha256[32];
 
   ~DexDumpTask();
+
+  // Default constructor
+  DexDumpTask() = default;
+
+  // No copy — raw pointer ownership
+  DexDumpTask(const DexDumpTask&) = delete;
+  DexDumpTask& operator=(const DexDumpTask&) = delete;
+
+  // Move — transfer ownership, source becomes nullptr
+  DexDumpTask(DexDumpTask&& other) noexcept
+      : package_name(std::move(other.package_name)),
+        pid(other.pid),
+        tid(other.tid),
+        location(std::move(other.location)),
+        data(other.data),
+        size(other.size) {
+    memcpy(sha256, other.sha256, 32);
+    other.data = nullptr;
+    other.size = 0;
+  }
+
+  DexDumpTask& operator=(DexDumpTask&& other) noexcept {
+    if (this != &other) {
+      delete[] data;
+      package_name = std::move(other.package_name);
+      pid = other.pid;
+      tid = other.tid;
+      location = std::move(other.location);
+      data = other.data;
+      size = other.size;
+      memcpy(sha256, other.sha256, 32);
+      other.data = nullptr;
+      other.size = 0;
+    }
+    return *this;
+  }
+
   bool CopyData(const uint8_t* src, size_t sz);
 };
 

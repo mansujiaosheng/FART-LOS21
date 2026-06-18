@@ -17,7 +17,7 @@ LOADER_SRC := zygisk_loader.cpp
 LOADER_OBJ := $(OUT_DIR)/zygisk_loader.o
 
 # ---- Hook core ----
-HOOK_SRCS  := config.cpp art_resolver.cpp dex_dump.cpp codeitem_dump.cpp hook_entry.cpp
+HOOK_SRCS  := config.cpp art_resolver.cpp dex_dump.cpp codeitem_dump.cpp hook_entry.cpp active_invoke.cpp
 HOOK_OBJS  := $(patsubst %.cpp,$(OUT_DIR)/%.o,$(HOOK_SRCS))
 
 # Dobby source files

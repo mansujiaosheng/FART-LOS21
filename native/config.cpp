@@ -120,6 +120,8 @@ bool LoadConfig(Config* config, const char* path) {
   find_bool("\"dump_dex\"", &config->dump_dex);
   find_bool("\"dump_code_item\"", &config->dump_code_item);
   find_bool("\"active_invoke\"", &config->active_invoke);
+  // Fallback: also check enable_active_invoke (controller compatibility)
+  find_bool("\"enable_active_invoke\"", &config->active_invoke);
   find_bool("\"enable_artmethod_hook\"", &config->enable_artmethod_hook);
   find_uint("\"artmethod_sample_rate\"", &config->artmethod_sample_rate);
   find_bool("\"enable_codeitem_dump\"", &config->enable_codeitem_dump);

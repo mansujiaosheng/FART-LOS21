@@ -6,6 +6,7 @@
 #include "dex_dump.h"
 #include "arm64_hook.h"
 #include "codeitem_dump.h"
+#include "active_invoke.h"
 
 #include <cstdio>
 #include <cstring>
@@ -48,6 +49,9 @@ static std::atomic<bool> g_artmethod_hook_active{false};
 
 // Stage 2.4: CodeItem dump worker
 static CodeItemDumper* g_codeitem_dumper = nullptr;
+
+// Stage 2.5: Active invoke engine
+static ActiveInvokeEngine* g_active_invoke_engine = nullptr;
 
 // Crash handlers
 static struct sigaction old_sigsegv;
@@ -135,7 +139,8 @@ void* DefineClassHook(void* class_linker, void* thread, const char* descriptor,
   // Deep copy and write synchronously (to /data/local/tmp/ for SELinux compatibility)
   pid_t pid = getpid();
   char filename[512];
-  snprintf(filename, sizeof(filename), "/data/local/tmp/fart_dump/dex_%d_%d.dex",
+  snprintf(filename, sizeof(filename), "%s/dex_%d_%d.dex",
+           g_config.dump_dir.c_str(),
            pid, (int)syscall(__NR_gettid));
 
   // Read into stack/local buffer first (validate), then write
@@ -519,7 +524,7 @@ static bool SetupHooks() {
 
   // Stage 2.4: Init CodeItem dumper (only when enabled)
   if (g_config.enable_codeitem_dump && g_config.enable_artmethod_hook) {
-    std::string codeitem_dir = g_config.dump_dir + "_dump";
+    std::string codeitem_dir = g_config.dump_dir;
     g_codeitem_dumper = new CodeItemDumper();
     if (!g_codeitem_dumper->Init(codeitem_dir.c_str(), g_config.max_codeitem_dumps)) {
       LOGE("CodeItemDumper init failed");
@@ -561,6 +566,19 @@ void fart_on_app_specialize(JNIEnv* env, const char* package_name, const char* m
   if (SetupHooks()) {
     // Snapshot: dump already-loaded dex files
     DumpAlreadyLoadedDex(env);
+
+    // Stage 2.5: Start active invoke engine (if enabled)
+    if (g_config.enable_active_invoke &&
+        g_config.enable_artmethod_hook &&
+        !g_config.active_invoke_classes.empty()) {
+      if (g_active_invoke_engine == nullptr) {
+        g_active_invoke_engine = new ActiveInvokeEngine();
+        g_active_invoke_engine->Start(env, package_name,
+                                       g_config.active_invoke_classes,
+                                       g_config.active_invoke_delay_ms,
+                                       g_config.active_invoke_max_methods);
+      }
+    }
   }
 }
 
