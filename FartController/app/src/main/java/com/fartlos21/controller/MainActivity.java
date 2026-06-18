@@ -15,9 +15,7 @@ import java.util.List;
 
 public class MainActivity extends Activity {
     private TextView statusText, statsText;
-    private Spinner modeSpinner;
-    private EditText classInput, maxMethodsInput, delayInput;
-    private CheckBox skipExecBox;
+    private Button selectBtn, startBtn, exportBtn;
     private String selectedPkg = "";
     private String selectedName = "";
 
@@ -33,79 +31,81 @@ public class MainActivity extends Activity {
 
         // Title
         TextView title = new TextView(this);
-        title.setText("FART\u63a7\u5236\u5668");
-        title.setTextSize(24);
+        title.setText("FART-LOS21 脱壳工具");
+        title.setTextSize(22);
         title.setGravity(Gravity.CENTER);
         root.addView(title);
 
         // Status
         statusText = new TextView(this);
-        statusText.setText("\u6a21\u5757: ...");
+        statusText.setText("模块状态: 检测中...");
+        statusText.setTextSize(14);
         root.addView(statusText);
 
-        // Refresh button
-        Button refreshBtn = new Button(this);
-        refreshBtn.setText("\u5237\u65b0");
-        root.addView(refreshBtn);
-        refreshBtn.setOnClickListener(v -> refresh());
+        // App selection row
+        LinearLayout appRow = new LinearLayout(this);
+        appRow.setOrientation(LinearLayout.HORIZONTAL);
+        selectBtn = new Button(this);
+        selectBtn.setText("选择目标应用");
+        selectBtn.setTextSize(14);
+        appRow.addView(selectBtn);
+        final TextView pkgLabel = new TextView(this);
+        pkgLabel.setText("（未选择）");
+        pkgLabel.setPadding(20, 0, 0, 0);
+        pkgLabel.setGravity(Gravity.CENTER_VERTICAL);
+        appRow.addView(pkgLabel);
+        root.addView(appRow);
 
-        // App selection
-        Button selectBtn = new Button(this);
-        selectBtn.setText("\u9009\u62e9\u5e94\u7528");
-        root.addView(selectBtn);
         selectBtn.setOnClickListener(v -> showAppList());
 
-        final TextView selectedLabel = new TextView(this);
-        selectedLabel.setText("\u672a\u9009\u62e9");
-        root.addView(selectedLabel);
+        // Info box
+        LinearLayout infoBox = new LinearLayout(this);
+        infoBox.setOrientation(LinearLayout.VERTICAL);
+        infoBox.setPadding(20, 20, 20, 20);
+        infoBox.setBackgroundColor(0x22FFFFFF);
+        root.addView(infoBox);
 
-        // Mode spinner
-        modeSpinner = new Spinner(this);
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(this,
-                android.R.layout.simple_spinner_item,
-                new String[]{"Dex Only", "CodeItem", "Active Invoke"});
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        modeSpinner.setAdapter(adapter);
-        root.addView(modeSpinner);
+        String[] infos = {
+            "✓ 拦截 DefineClass 实时 dump DEX",
+            "✓ Hook ArtMethod::Invoke 捕获 CodeItem",
+            "✓ 主动调用目标方法触发加壳方法解密",
+            "✓ 自动采样 + 去重，无需额外配置"
+        };
+        for (String s : infos) {
+            TextView tv = new TextView(this);
+            tv.setText(s);
+            tv.setTextSize(13);
+            infoBox.addView(tv);
+        }
 
-        // Active invoke config
-        classInput = new EditText(this);
-        classInput.setHint("\u7c7b\u540d\uff08\u6bcf\u884c\u4e00\u4e2a\uff09");
-        classInput.setLines(3);
-        root.addView(classInput);
-
-        maxMethodsInput = new EditText(this);
-        maxMethodsInput.setText("200");
-        root.addView(maxMethodsInput);
-
-        delayInput = new EditText(this);
-        delayInput.setText("3000");
-        root.addView(delayInput);
-
-        skipExecBox = new CheckBox(this);
-        skipExecBox.setText("\u8df3\u8fc7\u6267\u884c");
-        skipExecBox.setChecked(true);
-        root.addView(skipExecBox);
-
-        // Write & Launch
-        Button writeBtn = new Button(this);
-        writeBtn.setText("\u5199\u5165\u5e76\u542f\u52a8");
-        writeBtn.setTextSize(18);
-        root.addView(writeBtn);
-        writeBtn.setOnClickListener(v -> writeAndLaunch());
+        // Start button
+        startBtn = new Button(this);
+        startBtn.setText("▶ 开始脱壳");
+        startBtn.setTextSize(20);
+        startBtn.setPadding(0, 20, 0, 20);
+        root.addView(startBtn);
+        startBtn.setOnClickListener(v -> writeAndLaunch());
 
         // Stats
         statsText = new TextView(this);
+        statsText.setText("Dex: 0  |  CodeItem: 0");
+        statsText.setPadding(0, 20, 0, 0);
         root.addView(statsText);
 
         // Export
-        Button exportBtn = new Button(this);
-        exportBtn.setText("\u5bfc\u51fa\u5230 /sdcard");
+        exportBtn = new Button(this);
+        exportBtn.setText("导出到 /sdcard/FART-LOS21/");
         root.addView(exportBtn);
         exportBtn.setOnClickListener(v -> {
             RootShell.exportDump(selectedPkg);
-            Toast.makeText(this, "\u5bfc\u51fa\u5b8c\u6210", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "导出完成", Toast.LENGTH_SHORT).show();
         });
+
+        // Refresh button
+        Button refreshBtn = new Button(this);
+        refreshBtn.setText("刷新统计");
+        root.addView(refreshBtn);
+        refreshBtn.setOnClickListener(v -> refresh());
 
         setContentView(scroll);
         refresh();
@@ -118,16 +118,16 @@ public class MainActivity extends Activity {
 
         for (ApplicationInfo ai : apps) {
             if ((ai.flags & ApplicationInfo.FLAG_SYSTEM) != 0) continue;
-            String name = getPackageManager().getApplicationLabel(ai).toString();
-            names.add(name);
+            names.add(getPackageManager().getApplicationLabel(ai).toString());
             pkgs.add(ai.packageName);
         }
 
         new AlertDialog.Builder(this)
-            .setTitle("\u9009\u62e9\u76ee\u6807")
+            .setTitle("选择目标应用")
             .setItems(names.toArray(new String[0]), (dialog, which) -> {
                 selectedPkg = pkgs.get(which);
                 selectedName = names.get(which);
+                selectBtn.setText(selectedName);
                 refresh();
             })
             .show();
@@ -135,56 +135,38 @@ public class MainActivity extends Activity {
 
     private void refresh() {
         boolean ok = RootShell.isModuleInstalled();
-        statusText.setText("\u6a21\u5757: " + (ok ? "\u2713 \u5df2\u5b89\u88c5" : "\u2717 \u672a\u627e\u5230") + "  " + selectedName);
+        statusText.setText("模块状态: " + (ok ? "✓ 已安装" : "✗ 未找到"));
         String s = RootShell.getStats();
         String[] parts = s.split("\\|");
-        statsText.setText("Dex: " + (parts.length > 0 ? parts[0] : "0")
-            + "  JSON: " + (parts.length > 1 ? parts[1] : "0")
-            + "  Code: " + (parts.length > 2 ? parts[2] : "0"));
+        String dex = (parts.length > 0 ? parts[0] : "0");
+        String code = (parts.length > 2 ? parts[2] : "0");
+        statsText.setText("Dex: " + dex + "  |  CodeItem: " + code);
     }
 
     private void writeAndLaunch() {
         if (selectedPkg.isEmpty()) {
-            Toast.makeText(this, "\u8bf7\u5148\u9009\u62e9\u5e94\u7528", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "请先选择目标应用", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        int mode = modeSpinner.getSelectedItemPosition();
+        // Full config: enable everything for second-gen extraction shells
         StringBuilder json = new StringBuilder();
         json.append("{\"enable\":true,");
         json.append("\"packages\":[\"").append(selectedPkg).append("\"],");
-        json.append("\"dump_dir\":\"/data/local/tmp/fart\",\"dump_dex\":true,");
-
-        switch (mode) {
-            case 0:
-                json.append("\"enable_artmethod_hook\":false,\"enable_codeitem_dump\":false,\"enable_active_invoke\":false}");
-                break;
-            case 1:
-                json.append("\"enable_artmethod_hook\":true,\"artmethod_sample_rate\":100,");
-                json.append("\"enable_codeitem_dump\":true,\"max_codeitem_dumps\":500,\"enable_active_invoke\":false}");
-                break;
-            case 2: {
-                String cls = classInput.getText().toString().trim();
-                json.append("\"enable_artmethod_hook\":true,\"artmethod_sample_rate\":1,");
-                json.append("\"enable_codeitem_dump\":true,\"max_codeitem_dumps\":500,\"enable_active_invoke\":true,");
-                json.append("\"active_invoke_delay_ms\":").append(delayInput.getText()).append(",");
-                json.append("\"active_invoke_max_methods\":").append(maxMethodsInput.getText()).append(",");
-                json.append("\"active_invoke_skip_execute\":").append(skipExecBox.isChecked());
-                if (cls.isEmpty()) {
-                    json.append(",\"active_invoke_classes\":[]}");
-                } else {
-                    json.append(",\"active_invoke_classes\":[\"").append(cls.replace("\n", "\",\"")).append("\"]}");
-                }
-                break;
-            }
-        }
+        json.append("\"dump_dir\":\"/data/local/tmp/fart_dump\",\"dump_dex\":true,");
+        json.append("\"enable_artmethod_hook\":true,\"artmethod_sample_rate\":100,");
+        json.append("\"enable_codeitem_dump\":true,\"max_codeitem_dumps\":2000,");
+        json.append("\"enable_active_invoke\":true,");
+        json.append("\"active_invoke_delay_ms\":1000,\"active_invoke_max_methods\":500,");
+        json.append("\"active_invoke_skip_execute\":true,");
+        json.append("\"active_invoke_classes\":[]}");
 
         if (RootShell.writeConfig(json.toString())) {
-            Toast.makeText(this, "\u914d\u7f6e\u5df2\u5199\u5165", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "配置已写入，正在启动 " + selectedName, Toast.LENGTH_SHORT).show();
             RootShell.launchApp(selectedPkg);
             new Handler().postDelayed(() -> refresh(), 5000);
         } else {
-            Toast.makeText(this, "\u5199\u5165\u5931\u8d25", Toast.LENGTH_LONG).show();
+            Toast.makeText(this, "写入失败，请检查模块是否安装", Toast.LENGTH_LONG).show();
         }
     }
 }

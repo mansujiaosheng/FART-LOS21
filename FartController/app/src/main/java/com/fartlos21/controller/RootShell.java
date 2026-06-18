@@ -26,7 +26,7 @@ public class RootShell {
     }
 
     public static boolean isModuleInstalled() {
-        return !exec("ls /data/adb/modules/fart-los21/ 2>/dev/null || echo N").contains("N");
+        return !su("ls /data/adb/modules/fart-los21/ 2>/dev/null || echo N").contains("N");
     }
 
     public static boolean writeConfig(String json) {
