@@ -300,6 +300,76 @@ size_t CodeItemDumper::QueueSize() const {
 }
 
 // -----------------------------------------------------------------------
+// CodeItem size calculation
+// -----------------------------------------------------------------------
+size_t CodeItemDumper::CalculateCodeItemSize(const uint8_t* code_item,
+                                              uint16_t tries_size,
+                                              uint32_t insns_size) {
+  // Base: 16-byte header + instructions (2 bytes each)
+  size_t size = 16 + (size_t)insns_size * 2;
+
+  if (tries_size > 0) {
+    // Padding: if insns_size is odd, 2 bytes padding before try_items
+    if (insns_size & 1) size += 2;
+
+    // try_items: each is 8 bytes
+    size += (size_t)tries_size * 8;
+
+    // Parse encoded_catch_handler_list after try_items
+    const uint8_t* ptr = code_item + size;
+    uint32_t handlers_size = 0;
+    // ULEB128 decode handlers_size
+    uint32_t shift = 0;
+    while (*ptr & 0x80) { handlers_size |= (*ptr & 0x7F) << shift; shift += 7; ptr++; }
+    handlers_size |= (*ptr & 0x7F) << shift; ptr++;
+
+    for (uint32_t h = 0; h < handlers_size; h++) {
+      // SLEB128 size (negative = catch_all present)
+      int32_t handler_size = 0;
+      shift = 0;
+      while (*ptr & 0x80) { handler_size |= (*ptr & 0x7F) << shift; shift += 7; ptr++; }
+      handler_size |= (*ptr & 0x7F) << shift; ptr++;
+      if (handler_size & (1 << (shift < 7 ? 6 : (shift - 1)))) {
+        // Sign extend
+        handler_size |= -1 << (shift < 7 ? 7 : (shift + 1));
+      }
+      size += (ptr - (code_item + size));  // account for already-read handler_size bytes
+      // Reset ptr to point past handler_size
+      // Actually we need to count properly:
+      // handler_size ULEB bytes already counted in ptr advancement
+      // Now count type_addr_pairs
+      uint32_t count = (uint32_t)(handler_size > 0 ? handler_size : -handler_size);
+      for (uint32_t i = 0; i < count; i++) {
+        // type_idx ULEB128
+        while (*ptr & 0x80) { size++; ptr++; }
+        size++; ptr++;
+        // addr ULEB128
+        while (*ptr & 0x80) { size++; ptr++; }
+        size++; ptr++;
+      }
+      if (handler_size <= 0) {
+        // catch_all_addr ULEB128
+        while (*ptr & 0x80) { size += 2; ptr++; }
+        size++; ptr++;
+      }
+    }
+  }
+
+  return size;
+}
+
+bool CodeItemDumper::IsValidCodeItem(const CodeItemDumpTask& task) {
+  if (task.data == nullptr || task.dump_size == 0) return false;
+  if (task.registers_size > 256) return false;
+  if (task.ins_size > 256) return false;
+  if (task.outs_size > 256) return false;
+  if (task.insns_size == 0 || task.insns_size > 524288) return false;  // max 1MB/2
+  if (task.tries_size > 65535) return false;
+  if (task.dump_size > 2 * 1024 * 1024) return false;  // max 2MB
+  return true;
+}
+
+// -----------------------------------------------------------------------
 // Directory & file writing
 // -----------------------------------------------------------------------
 bool CodeItemDumper::EnsureMethodsDir() {
@@ -345,14 +415,15 @@ bool CodeItemDumper::WriteJsonFile(const CodeItemDumpTask& task) {
       "  \"insns_size\": %u,\n"
       "  \"dump_size\": %zu,\n"
       "  \"dump_complete\": %s,\n"
-      "  \"source\": \"ArtMethodInvoke\"\n"
+      "  \"source\": \"%s\"\n"
       "}\n",
       task.pid, task.tid,
       task.method_idx, task.sha256_prefix,
       task.registers_size, task.ins_size, task.outs_size,
       task.tries_size, task.insns_size,
       task.dump_size,
-      task.dump_complete ? "true" : "false");
+      task.dump_complete ? "true" : "false",
+      task.source);
 
   ssize_t written = write(fd, buf, (size_t)(n < (int)sizeof(buf) ? n : (int)sizeof(buf) - 1));
   close(fd);
@@ -413,11 +484,13 @@ bool CodeItemDumper::AppendCsv(const CodeItemDumpTask& task) {
     return false;
   }
 
-  char line[256];
-  int n = snprintf(line, sizeof(line), "%u,%.16s,%u,%u,%s\n",
+  char line[512];
+  int n = snprintf(line, sizeof(line), "%u,%.16s,%u,%zu,%s,%s,%u,%u,%u,%u\n",
                    task.method_idx, task.sha256_prefix,
                    task.insns_size, task.dump_size,
-                   task.dump_complete ? "complete" : "partial");
+                   task.dump_complete ? "complete" : "partial",
+                   task.source,
+                   task.registers_size, task.ins_size, task.outs_size, task.tries_size);
   write(fd, line, (size_t)(n < (int)sizeof(line) ? n : (int)sizeof(line) - 1));
   close(fd);
   return true;
@@ -445,7 +518,7 @@ void CodeItemDumper::WorkerLoop() {
       snprintf(filename, sizeof(filename), "%s/methods/method_index.csv", dir.c_str());
       int fd = open(filename, O_CREAT | O_WRONLY | O_TRUNC, 0644);
       if (fd >= 0) {
-        const char* header = "method_idx,sha256_prefix,insns_size,dump_size,status\n";
+        const char* header = "method_idx,sha256_prefix,insns_size,dump_size,status,source,registers_size,ins_size,outs_size,tries_size\n";
         write(fd, header, strlen(header));
         close(fd);
       }
@@ -470,6 +543,14 @@ void CodeItemDumper::WorkerLoop() {
     // Check max limit
     if (dumped_count_.load() >= max_dumps_) {
       LOGW("codeitem_dump: max reached, dropping queue (remaining=%zu)", queue_.size());
+      continue;
+    }
+
+    // Validate before writing
+    if (!IsValidCodeItem(task)) {
+      LOGW("codeitem_dump: invalid task for method_%u (regs=%u ins=%u outs=%u tries=%u insns=%u)",
+           task.method_idx, task.registers_size, task.ins_size, task.outs_size,
+           task.tries_size, task.insns_size);
       continue;
     }
 

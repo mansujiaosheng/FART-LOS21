@@ -22,12 +22,15 @@ struct CodeItemDumpTask {
   uint16_t outs_size;
   uint16_t tries_size;
   uint32_t insns_size;
-  size_t dump_size;           // total bytes to write (header + insns)
-  bool dump_complete;         // false if tries>0 (try/catch not dumped)
+  size_t dump_size;           // total bytes to write
+  bool dump_complete;         // true: full code_item, false: partial
   uint8_t* data = nullptr;    // owned buffer
 
   // SHA256 first 8 hex chars for dedup
   char sha256_prefix[17];
+
+  // Source of this dump: "ArtMethodInvoke" or "active_invoke"
+  char source[32];
 
   CodeItemDumpTask();
   ~CodeItemDumpTask();
@@ -50,6 +53,7 @@ struct CodeItemDumpTask {
         dump_complete(other.dump_complete),
         data(other.data) {
     memcpy(sha256_prefix, other.sha256_prefix, 17);
+    memcpy(source, other.source, 32);
     other.data = nullptr;
     other.dump_size = 0;
   }
@@ -69,6 +73,7 @@ struct CodeItemDumpTask {
       dump_complete = other.dump_complete;
       data = other.data;
       memcpy(sha256_prefix, other.sha256_prefix, 17);
+      memcpy(source, other.source, 32);
       other.data = nullptr;
       other.dump_size = 0;
     }
@@ -119,9 +124,15 @@ class CodeItemDumper {
   // Worker thread function
   void WorkerLoop();
 
-  // Compute SHA256 of data (uses the same inline SHA256 from dex_dump.h)
+  // Compute SHA256 of data
   static void ComputeSha256(const uint8_t* data, size_t size, uint8_t out[32]);
   static void BytesToHex(const uint8_t* bytes, size_t len, char* out_hex);
+
+  // Validate code_item fields
+  static bool IsValidCodeItem(const CodeItemDumpTask& task);
+
+  // Calculate complete code_item size including try/catch handlers
+  static size_t CalculateCodeItemSize(const uint8_t* code_item, uint16_t tries_size, uint32_t insns_size);
 
   // Ensure methods directory exists
   bool EnsureMethodsDir();

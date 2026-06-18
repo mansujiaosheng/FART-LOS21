@@ -195,9 +195,10 @@ void* DefineClassHook(void* class_linker, void* thread, const char* descriptor,
 }
 
 // ===== ArtMethod::Invoke Hook (Phase 2) =====
+// Signature matches ART source: Invoke(Thread*, uint32_t*, uint32_t, JValue*, const char*)
 extern "C" __attribute__((used))
-void ArtMethodInvokeHook(void* art_method, void* thread, void* args,
-                          void* args_size_val, void* result, void* shorty) {
+void ArtMethodInvokeHook(void* art_method, void* thread, uint32_t* args,
+                          uint32_t args_size, void* result, const char* shorty) {
   // Reentry guard: prevent recursion if ArtMethod::Invoke is called
   // within our own callback (e.g. via LOGI -> android_log_print -> ...)
   if (g_fart_in_invoke) {
@@ -270,7 +271,9 @@ void ArtMethodInvokeHook(void* art_method, void* thread, void* args,
                 citask.tries_size = tries;
                 citask.insns_size = insns;
                 citask.dump_size = 16 + (size_t)insns * 2;
-                citask.dump_complete = (tries == 0);  // true only if no try/catch blocks
+                citask.dump_complete = (tries == 0);
+                snprintf(citask.source, sizeof(citask.source), "%s",
+                         g_active_invoke_running ? "active_invoke" : "ArtMethodInvoke");
 
                 // Sync memcpy to owned buffer (safe copy)
                 if (citask.CopyData(ci, citask.dump_size)) {
@@ -303,9 +306,9 @@ void ArtMethodInvokeHook(void* art_method, void* thread, void* args,
 
 call_original:
   if (g_artmethod_invoke_orig) {
-    auto orig = reinterpret_cast<void (*)(void*, void*, void*, void*, void*, void*)>(
+    auto orig = reinterpret_cast<void (*)(void*, void*, uint32_t*, uint32_t, void*, const char*)>(
         g_artmethod_invoke_orig);
-    orig(art_method, thread, args, args_size_val, result, shorty);
+    orig(art_method, thread, args, args_size, result, shorty);
   }
   g_fart_in_invoke = false;
 }
