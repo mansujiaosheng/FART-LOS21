@@ -298,20 +298,11 @@ public class MainActivity extends Activity {
     }
 
     private void exportDump() {
+        String exportDir = normalizeExportDir(exportBaseDir);
         if (selectedPkg.isEmpty()) {
             Toast.makeText(this, "请先选择目标应用", Toast.LENGTH_SHORT).show();
             return;
         }
-
-        String[] parts = RootShell.getStats().split("\\|");
-        int dex = parseInt(parts.length > 0 ? parts[0] : "0");
-        int code = parseInt(parts.length > 2 ? parts[2] : "0");
-        if (dex == 0 && code == 0) {
-            Toast.makeText(this, "未发现 dump 文件，请先打开目标应用并刷新统计", Toast.LENGTH_LONG).show();
-            return;
-        }
-
-        String exportDir = normalizeExportDir(exportBaseDir);
         if (!RootShell.exportDump(selectedPkg, exportDir)) {
             Toast.makeText(this, "导出请求写入失败", Toast.LENGTH_LONG).show();
             notifyStatus("导出失败", "导出请求写入失败");
@@ -320,7 +311,7 @@ public class MainActivity extends Activity {
 
         Toast.makeText(this, "导出请求已发送，等待模块处理", Toast.LENGTH_SHORT).show();
         notifyStatus("导出请求已发送", exportDir + "/" + selectedPkg);
-        new Handler().postDelayed(this::showExportResult, 2500);
+        new Handler().postDelayed(this::showExportResult, 5000);
     }
 
     private void showExportResult() {
