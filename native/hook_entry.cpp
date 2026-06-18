@@ -137,29 +137,55 @@ void* DefineClassHook(void* class_linker, void* thread, const char* descriptor,
   uint32_t dex_size = *(const uint32_t*)(begin + 0x20);
   if (dex_size < 64 || dex_size > 0x20000000) { LOGW("invalid size: %u", dex_size); return result; }
 
-  // Cap to the first readable mapped segment containing begin_
+  // Try to recover the full DEX from the DexFileContainer
+  // container_ is a shared_ptr<DexFileContainer> at DexFile+0xB0
+  // The first 8 bytes are the raw pointer to the DexFileContainer object
+  // For MemoryDexFileContainer: vptr(0x00) + begin_(0x08) + end_(0x10)
+  // If end_ - begin_ > dex_size, use the container size for a complete dump
   {
-    FILE* mf = fopen("/proc/self/maps", "r");
-    if (mf) {
-      uintptr_t b = (uintptr_t)begin;
-      char line[512];
-      while (fgets(line, sizeof(line), mf)) {
-        uintptr_t s, e;
-        char perms[8] = {};
-        if (sscanf(line, "%lx-%lx %7s", &s, &e, perms) >= 3) {
-          if (perms[0] == 'r' && b >= s && b < e) {
-            size_t max_size = (size_t)(e - b);
-            if (max_size < (size_t)dex_size) {
-              LOGI("Dex: begin=%p header_size=%u mapped_size=%zu", begin, dex_size, max_size);
-              dex_size = (uint32_t)max_size;
+    uintptr_t container_ptr = 0;
+    // Try offset +0xB0 (standard layout) and +0xB8 (alternative, +0xA8 with 32-byte string)
+    static const int kContainerOffsets[] = {0xB0, 0xB8, 0xA8, 0xC0, 0xC8};
+    for (int off : kContainerOffsets) {
+      uintptr_t candidate = *(const uintptr_t*)(dex_obj + off);
+      candidate = candidate & 0x00FFFFFFFFFFFFFFULL;
+      // Direct read: try to read begin_ from potential container
+      if (candidate != 0 && candidate >= 0x7000000000ULL) {
+        uintptr_t c_begin = *(const uintptr_t*)(candidate + 0x08);
+        c_begin = c_begin & 0x00FFFFFFFFFFFFFFULL;
+        if (c_begin == (uintptr_t)begin) {
+          uintptr_t c_end = *(const uintptr_t*)(candidate + 0x10);
+          c_end = c_end & 0x00FFFFFFFFFFFFFFULL;
+          if (c_end > c_begin) {
+            size_t container_sz = c_end - c_begin;
+            if (container_sz > (size_t)dex_size) {
+              LOGI("Dex: container at +0x%x gives full size=%zu (header said %u)",
+                   off, container_sz, dex_size);
+              dex_size = (uint32_t)container_sz;
+            } else {
+              LOGI("Dex: container at +0x%x size=%zu matches header %u",
+                   off, container_sz, dex_size);
             }
+            container_ptr = candidate;
             break;
           }
         }
       }
-      fclose(mf);
+    }
+    if (container_ptr == 0) {
+      // Debug: dump raw pointer values at candidate offsets
+      for (int off : kContainerOffsets) {
+        uintptr_t val = *(const uintptr_t*)(dex_obj + off);
+        val = val & 0x00FFFFFFFFFFFFFFULL;
+        if (val != 0) {
+          LOGI("Dex: offset +0x%x = 0x%lx", off, val);
+        }
+      }
+      LOGI("Dex: begin=%p size=%u (no container)", begin, dex_size);
     }
   }
+
+  LOGI("Dex size used: %u bytes", dex_size);
 
   // Deep copy and write synchronously (to /data/local/tmp/ for SELinux compatibility)
   pid_t pid = getpid();
@@ -172,22 +198,33 @@ void* DefineClassHook(void* class_linker, void* thread, const char* descriptor,
   int fd = open(filename, O_CREAT | O_WRONLY | O_TRUNC, 0644);
   if (fd < 0) { LOGE("cannot open %s", filename); return result; }
 
-  // Write in chunks
+  // Write in chunks, skip unreadable pages
   const uint8_t* ptr = begin;
   size_t remaining = dex_size;
-  bool write_ok = true;
-  while (remaining > 0) {
+  size_t total_written = 0;
+  bool had_error = false;
+  while (remaining > 0 && !had_error) {
     size_t chunk = (remaining > 65536) ? 65536 : remaining;
-    // Validate first byte of each chunk before writing
-    volatile uint8_t check = ptr[0]; (void)check;
     ssize_t w = write(fd, ptr, chunk);
-    if (w <= 0) { write_ok = false; break; }
-    remaining -= (size_t)w;
-    ptr += w;
+    if (w > 0) {
+      remaining -= (size_t)w;
+      ptr += w;
+      total_written += (size_t)w;
+    } else if (w == 0) {
+      break;
+    } else {
+      // EFAULT: page not readable, skip 1 page and retry
+      size_t skip = 4096;
+      if (skip > remaining) skip = remaining;
+      remaining -= skip;
+      ptr += skip;
+      had_error = true;
+      LOGW("write EFAULT at offset %zu, skipping page", total_written);
+    }
   }
   close(fd);
-  if (write_ok) {
-    LOGI("Dumped dex: %s (%u bytes)", filename, dex_size);
+  if (total_written > 0) {
+    LOGI("Dumped dex: %s (%zu bytes of %u)", filename, total_written, dex_size);
   } else {
     LOGE("write failed for %s", filename);
     unlink(filename);
