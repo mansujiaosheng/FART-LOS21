@@ -21,12 +21,9 @@ public class MainActivity extends Activity {
     private String selectedPkg = "";
     private String selectedName = "";
 
-    private String tmpDir;
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        tmpDir = getCacheDir().getPath();
 
         ScrollView scroll = new ScrollView(this);
         LinearLayout root = new LinearLayout(this);
@@ -47,19 +44,11 @@ public class MainActivity extends Activity {
         statusText.setTextSize(14);
         root.addView(statusText);
 
-        // App selection row
-        LinearLayout appRow = new LinearLayout(this);
-        appRow.setOrientation(LinearLayout.HORIZONTAL);
+        // App selection
         selectBtn = new Button(this);
         selectBtn.setText("选择目标应用");
         selectBtn.setTextSize(14);
-        appRow.addView(selectBtn);
-        final TextView pkgLabel = new TextView(this);
-        pkgLabel.setText("（未选择）");
-        pkgLabel.setPadding(20, 0, 0, 0);
-        pkgLabel.setGravity(Gravity.CENTER_VERTICAL);
-        appRow.addView(pkgLabel);
-        root.addView(appRow);
+        root.addView(selectBtn);
 
         selectBtn.setOnClickListener(v -> showAppList());
 
@@ -252,7 +241,7 @@ public class MainActivity extends Activity {
         json.append("\"active_invoke_skip_execute\":true,");
         json.append("\"active_invoke_classes\":[]}");
 
-        if (RootShell.writeConfig(json.toString(), tmpDir)) {
+        if (RootShell.writeConfig(json.toString())) {
             Toast.makeText(this, "配置已写入，正在启动 " + selectedName, Toast.LENGTH_SHORT).show();
             RootShell.launchApp(selectedPkg);
             new Handler().postDelayed(() -> refresh(), 5000);
