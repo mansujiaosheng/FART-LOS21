@@ -22,7 +22,7 @@ static const char* kConfigPaths[] = {
   "/data/local/tmp/fart/config.json",
   nullptr
 };
-static const char* kHookLib = "/data/adb/modules/fart-los21/lib64/libfart-hook.so";
+static const char* kHookLib = "/data/local/tmp/fart/libfart-hook.so";
 
 static char* readFile(const char *path) {
     FILE *f = fopen(path, "r");
