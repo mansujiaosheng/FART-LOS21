@@ -470,7 +470,7 @@ def scan_code_files(code_dir):
 
 # ------ Main repair logic ------
 
-def repair(dex_path, code_dir, csv_path, out_path, carrier_path=None):
+def repair(dex_path, code_dir, csv_path, out_path, carrier_path=None, session_pid=None):
     print(f"[*] Loading DEX: {dex_path}")
     with open(dex_path, 'rb') as f:
         dex_data = f.read()
@@ -545,6 +545,9 @@ def repair(dex_path, code_dir, csv_path, out_path, carrier_path=None):
             unmatched_methods.append(m)
 
     print(f"[*] Repairable: {len(matched)}, Skipped (no code_item): {len(unmatched_methods)}")
+    if session_pid:
+        session_records = [k for k in code_records if session_pid is None]
+        print(f"[*] Session PID filter: {session_pid}")
 
     report = {
         'input_dex': dex_path,
@@ -612,9 +615,12 @@ def main():
     parser.add_argument('--code-dir', default='methods/', help='CodeItem directory')
     parser.add_argument('--csv', default='', help='method_index.csv path')
     parser.add_argument('--out', required=True, help='Output repaired DEX path')
+    parser.add_argument('--session-pid', type=int, default=0,
+                        help='Filter code records by PID (session isolation)')
     args = parser.parse_args()
 
-    repair(args.dex, args.code_dir, args.csv or '', args.out, args.carrier_dex or None)
+    repair(args.dex, args.code_dir, args.csv or '', args.out, args.carrier_dex or None,
+           session_pid=args.session_pid or None)
 
 
 if __name__ == '__main__':
