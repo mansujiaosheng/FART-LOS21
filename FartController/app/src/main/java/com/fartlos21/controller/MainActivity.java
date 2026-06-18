@@ -21,9 +21,12 @@ public class MainActivity extends Activity {
     private String selectedPkg = "";
     private String selectedName = "";
 
+    private String tmpDir;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        tmpDir = getCacheDir().getPath();
 
         ScrollView scroll = new ScrollView(this);
         LinearLayout root = new LinearLayout(this);
@@ -249,7 +252,7 @@ public class MainActivity extends Activity {
         json.append("\"active_invoke_skip_execute\":true,");
         json.append("\"active_invoke_classes\":[]}");
 
-        if (RootShell.writeConfig(json.toString())) {
+        if (RootShell.writeConfig(json.toString(), tmpDir)) {
             Toast.makeText(this, "配置已写入，正在启动 " + selectedName, Toast.LENGTH_SHORT).show();
             RootShell.launchApp(selectedPkg);
             new Handler().postDelayed(() -> refresh(), 5000);

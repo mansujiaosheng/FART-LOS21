@@ -32,13 +32,13 @@ public class RootShell {
         return !su("ls /data/adb/modules/fart-los21/ 2>/dev/null || echo N").contains("N");
     }
 
-    public static boolean writeConfig(String json) {
+    public static boolean writeConfig(String json, String tmpDir) {
         try {
-            FileWriter f = new FileWriter("/data/local/tmp/fart_config.json");
+            FileWriter f = new FileWriter(tmpDir + "/fart_config.json");
             f.write(json);
             f.close();
-            String r = su("cp /data/local/tmp/fart_config.json /data/adb/modules/fart-los21/config/config.json && chmod 644 /data/adb/modules/fart-los21/config/config.json && echo Y || echo N");
-            new File("/data/local/tmp/fart_config.json").delete();
+            String r = su("cp " + tmpDir + "/fart_config.json /data/adb/modules/fart-los21/config/config.json && chmod 644 /data/adb/modules/fart-los21/config/config.json && echo Y || echo N");
+            new File(tmpDir + "/fart_config.json").delete();
             return r.contains("Y");
         } catch (Exception e) {
             return false;
