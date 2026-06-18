@@ -594,8 +594,65 @@ def repair(dex_path, code_dir, csv_path, out_path, carrier_path=None, session_pi
     print(f"[*] Updating DEX header...")
     repair_base.update_header()
 
-    # Verify the repaired DEX
-    file_size = struct.unpack_from('<I', repair_base.data, 0x20)[0]
+    # ----- Hard validation -----
+    file_size = len(repair_base.data)
+    hdr = repair_base.data
+
+    def check_offset(label, off, size=1):
+        if off + size > file_size:
+            return f"{label} (0x{off:x}+0x{size:x}) exceeds file (0x{file_size:x})"
+        return None
+
+    errors = []
+    map_off = struct.unpack_from('<I', hdr, 0x34)[0]
+    hdr_size = struct.unpack_from('<I', hdr, 0x24)[0]
+    data_off = struct.unpack_from('<I', hdr, hdr_size + 0x68)[0] if hdr_size >= 0x70 else 0
+    data_size = struct.unpack_from('<I', hdr, hdr_size + 0x68 + 4)[0] if hdr_size >= 0x70 else 0
+
+    if map_off > 0:
+        e = check_offset("map_list", map_off)
+        if e: errors.append(e)
+    e = check_offset("data section", data_off, data_size)
+    if e: errors.append(e)
+
+    # Check class_data_off
+    bad_class_data = 0
+    total_class_data = 0
+    for ci in range(repair_base.class_defs_size):
+        off = repair_base.class_defs_off + ci * 32 + 24
+        if off + 4 > len(hdr):
+            break
+        cdo = struct.unpack_from('<I', hdr, off)[0]
+        if cdo > 0:
+            total_class_data += 1
+            if cdo >= file_size:
+                bad_class_data += 1
+
+    if total_class_data > 0:
+        pct = bad_class_data * 100 // total_class_data
+        if pct > 10:
+            errors.append(f"{bad_class_data}/{total_class_data} class_data_off point beyond file ({pct}%)")
+
+    report['validation'] = {
+        'map_off': map_off,
+        'data_off': data_off,
+        'data_size': data_size,
+        'file_size': file_size,
+        'bad_class_data_off': bad_class_data,
+        'total_class_data_off': total_class_data,
+        'errors': errors,
+    }
+
+    if errors:
+        report['status'] = 'incomplete'
+        print(f"[!] Validation FAILED ({len(errors)} issues):")
+        for e in errors:
+            print(f"    - {e}")
+    else:
+        report['status'] = 'complete'
+        print(f"[✓] Validation passed")
+
+    # Print summary
     print(f"[*] DEX: header_size={struct.unpack_from('<I', repair_base.data, 0x24)[0]}, file_size={file_size}, actual={len(repair_base.data)} match={file_size==len(repair_base.data)}")
 
     print(f"[*] Saving repaired DEX to: {out_path}")

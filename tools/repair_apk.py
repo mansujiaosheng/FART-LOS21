@@ -96,9 +96,29 @@ def find_code_dir(dump_dir):
 def main():
     parser = argparse.ArgumentParser(description='FART-LOS21 APK-level DEX Repair')
     parser.add_argument('--apk', required=True, help='Target APK file')
+    parser.add_argument('--device-pkg', default='',
+                        help='Package name on device (optional, pulls split APKs)')
     parser.add_argument('--dump-dir', required=True, help='FART dump directory')
     parser.add_argument('--out', required=True, help='Output directory for repaired APK')
+    parser.add_argument('--adb', default='', help='ADB command prefix (e.g. "adb -H 192.168.1.1 -P 5037")')
     args = parser.parse_args()
+
+    # If device package specified, pull APK + splits
+    if args.device_pkg and args.adb:
+        print(f"[*] Pulling APKs for {args.device_pkg} from device...")
+        import subprocess
+        pm_cmd = f"{args.adb} shell kp -c \"pm path {args.device_pkg}\""
+        result = subprocess.run(pm_cmd, shell=True, capture_output=True, text=True)
+        for line in result.stdout.strip().split('\n'):
+            if line.startswith('package:'):
+                apk_path = line[8:]
+                out_name = os.path.basename(apk_path)
+                out_file = os.path.join(os.path.dirname(args.apk), out_name)
+                pull_cmd = f"{args.adb} pull {apk_path} {out_file}"
+                subprocess.run(pull_cmd, shell=True)
+                print(f"  Pulled: {out_name}")
+    elif args.device_pkg:
+        print("[!] --device-pkg requires --adb argument")
 
     os.makedirs(args.out, exist_ok=True)
 
@@ -150,11 +170,17 @@ def main():
                     continue
                 d_mids = struct.unpack_from('<I', ddata, 0x58)[0]
                 c_mids = struct.unpack_from('<I', cdata, 0x58)[0]
-                # Also check class_defs count
                 d_cds = struct.unpack_from('<I', ddata, 0x60)[0]
                 c_cds = struct.unpack_from('<I', cdata, 0x60)[0]
 
-                # Score based on matching metadata
+                # Exact match method_ids + class_defs = instant match
+                if d_mids == c_mids and d_cds == c_cds:
+                    best_score = 100
+                    best_match = (cname, dp, ddata)
+                    print(f"      Exact match! method_ids={d_mids}, class_defs={d_cds}")
+                    break
+
+                # Score based on fuzzy matching
                 score = 0
                 if d_mids == c_mids:
                     score += 50
