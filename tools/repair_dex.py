@@ -470,11 +470,43 @@ def scan_code_files(code_dir):
 
 # ------ Main repair logic ------
 
-def repair(dex_path, code_dir, csv_path, out_path):
+def repair(dex_path, code_dir, csv_path, out_path, carrier_path=None):
     print(f"[*] Loading DEX: {dex_path}")
     with open(dex_path, 'rb') as f:
         dex_data = f.read()
     dex = DexFile(dex_data)
+
+    # If carrier DEX provided, use it as structural base
+    if carrier_path and os.path.exists(carrier_path):
+        print(f"[*] Using carrier DEX: {carrier_path}")
+        with open(carrier_path, 'rb') as f:
+            carrier_data = bytearray(f.read())
+        # Merge class_data_off updates from dumped DEX into carrier
+        # The dumped DEX may have class_data_items that the carrier doesn't
+        # For now, just use carrier's structure and append code_items
+        repair_base = DexFile(bytes(carrier_data))
+        # The carrier should cover at least the same method_ids
+        if repair_base.method_ids_size < dex.method_ids_size:
+            print(f"[!] Carrier has fewer method_ids ({repair_base.method_ids_size} vs {dex.method_ids_size}), falling back to dumped DEX")
+            repair_base = dex
+        else:
+            # Copy class_data_off from dumped DEX where they differ
+            # (runtime may have updated class_data_items)
+            for ci in range(min(dex.class_defs_size, repair_base.class_defs_size)):
+                cd_dump = dex.read_class_def(ci)
+                cd_carrier = repair_base.read_class_def(ci)
+                if cd_dump['class_data_off'] != cd_carrier['class_data_off'] and cd_dump['class_data_off'] != 0:
+                    # Dumped class_data_off points to a runtime-modified class_data_item
+                    # Copy it into carrier
+                    class_def_off = repair_base.class_defs_off + ci * 32 + 24
+                    struct.pack_into('<I', repair_base.data, class_def_off, cd_dump['class_data_off'])
+            # Also copy any appended class_data from dumped to carrier
+            if len(dex.data) > dex.file_size:
+                appended = bytes(dex.data[dex.file_size:])
+                repair_base.data.extend(appended)
+            print(f"[*] Carrier merged: method_ids={repair_base.method_ids_size} class_defs={repair_base.class_defs_size}")
+    else:
+        repair_base = dex
 
     print(f"[*] Loading code items...")
     if csv_path and os.path.exists(csv_path):
@@ -488,11 +520,11 @@ def repair(dex_path, code_dir, csv_path, out_path):
             code_records = scan_code_files(code_dir)
 
     print(f"[*] Finding encoded methods...")
-    encoded_methods = dex.find_encoded_methods()
+    encoded_methods = repair_base.find_encoded_methods()
     print(f"[*] Found {len(encoded_methods)} encoded methods")
 
-    missing = [m for m in encoded_methods if m['code_off'] == 0 or m['code_off'] >= len(dex.data)]
-    has_code = [m for m in encoded_methods if m['code_off'] > 0 and m['code_off'] < len(dex.data)]
+    missing = [m for m in encoded_methods if m['code_off'] == 0 or m['code_off'] >= len(repair_base.data)]
+    has_code = [m for m in encoded_methods if m['code_off'] > 0 and m['code_off'] < len(repair_base.data)]
     print(f"[*] Missing/invalid code: {len(missing)}, with valid code: {len(has_code)}")
 
     # Match code records to methods (by method_idx, prefer matching dex_key)
@@ -540,9 +572,9 @@ def repair(dex_path, code_dir, csv_path, out_path):
             report['errors'].append(f"Method {midx}: invalid code data ({len(code_data) if code_data else 0} bytes)")
             continue
 
-        new_off = dex.append_data(code_data)
+        new_off = repair_base.append_data(code_data)
         old_code_offs[new_off] = m['code_off']
-        success = dex.update_code_off(midx, new_off)
+        success = repair_base.update_code_off(midx, new_off)
         if success:
             repaired_count += 1
             print(f"  [+] Method {midx}: code_off 0x{m['code_off']:x} -> 0x{new_off:x} ({len(code_data)} bytes, {rec.source})")
@@ -557,17 +589,14 @@ def repair(dex_path, code_dir, csv_path, out_path):
     report['new_map_off'] = 0
 
     print(f"[*] Updating DEX header...")
-    dex.update_header()
-
-    print(f"[*] Updating DEX header...")
-    dex.update_header()
+    repair_base.update_header()
 
     # Verify the repaired DEX
-    file_size = struct.unpack_from('<I', dex.data, 0x20)[0]
-    print(f"[*] DEX: header_size={struct.unpack_from('<I', dex.data, 0x24)[0]}, file_size={file_size}, actual={len(dex.data)} match={file_size==len(dex.data)}")
+    file_size = struct.unpack_from('<I', repair_base.data, 0x20)[0]
+    print(f"[*] DEX: header_size={struct.unpack_from('<I', repair_base.data, 0x24)[0]}, file_size={file_size}, actual={len(repair_base.data)} match={file_size==len(repair_base.data)}")
 
     print(f"[*] Saving repaired DEX to: {out_path}")
-    dex.save(out_path)
+    repair_base.save(out_path)
 
     report_path = os.path.join(os.path.dirname(out_path) or '.', 'repair_report.json')
     with open(report_path, 'w') as f:
@@ -578,13 +607,14 @@ def repair(dex_path, code_dir, csv_path, out_path):
 
 def main():
     parser = argparse.ArgumentParser(description='FART-LOS21 Dex Repair Tool v2')
-    parser.add_argument('--dex', required=True, help='Input DEX file')
+    parser.add_argument('--dex', required=True, help='Input DEX file (dumped)')
+    parser.add_argument('--carrier-dex', default='', help='Complete original DEX (optional, for map_list preservation)')
     parser.add_argument('--code-dir', default='methods/', help='CodeItem directory')
     parser.add_argument('--csv', default='', help='method_index.csv path')
     parser.add_argument('--out', required=True, help='Output repaired DEX path')
     args = parser.parse_args()
 
-    repair(args.dex, args.code_dir, args.csv or '', args.out)
+    repair(args.dex, args.code_dir, args.csv or '', args.out, args.carrier_dex or None)
 
 
 if __name__ == '__main__':
