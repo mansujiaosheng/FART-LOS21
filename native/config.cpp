@@ -119,9 +119,9 @@ bool LoadConfig(Config* config, const char* path) {
   find_string("\"dump_dir\"", &config->dump_dir);
   find_bool("\"dump_dex\"", &config->dump_dex);
   find_bool("\"dump_code_item\"", &config->dump_code_item);
-  find_bool("\"active_invoke\"", &config->active_invoke);
+  find_bool("\"active_invoke\"", &config->enable_active_invoke);
   // Fallback: also check enable_active_invoke (controller compatibility)
-  find_bool("\"enable_active_invoke\"", &config->active_invoke);
+  find_bool("\"enable_active_invoke\"", &config->enable_active_invoke);
   find_bool("\"enable_artmethod_hook\"", &config->enable_artmethod_hook);
   find_uint("\"artmethod_sample_rate\"", &config->artmethod_sample_rate);
   find_bool("\"enable_codeitem_dump\"", &config->enable_codeitem_dump);
@@ -130,7 +130,7 @@ bool LoadConfig(Config* config, const char* path) {
 
   LOGI("Config loaded: enable=%d, packages=%zu, dump_dex=%d, dump_code_item=%d, active_invoke=%d, artmethod_hook=%d, sample_rate=%u, codeitem_dump=%d, max_dumps=%u",
        config->enable, config->packages.size(),
-       config->dump_dex, config->dump_code_item, config->active_invoke,
+       config->dump_dex, config->dump_code_item, config->enable_active_invoke,
        config->enable_artmethod_hook, config->artmethod_sample_rate,
        config->enable_codeitem_dump, config->max_codeitem_dumps);
 
