@@ -53,6 +53,10 @@ static CodeItemDumper* g_codeitem_dumper = nullptr;
 // Stage 2.5: Active invoke engine
 static ActiveInvokeEngine* g_active_invoke_engine = nullptr;
 
+// P5: ClassLinker::LoadMethod hook
+static Arm64InlineHook* g_load_method_hook = nullptr;
+static void* g_load_method_orig = nullptr;
+
 // Crash handlers
 static struct sigaction old_sigsegv;
 static struct sigaction old_sigbus;
@@ -461,6 +465,72 @@ static void DumpAlreadyLoadedDex(JNIEnv* env) {
   LOGI("snapshot: done, queue=%zu", g_dumper->QueueSize());
 }
 
+// ===== ClassLinker::LoadMethod Hook (P5) =====
+// Called when ART loads a method from DEX. This is where code_item becomes available.
+// Signature (from class_linker.h):
+//   void LoadMethod(const DexFile& dex_file, const ClassAccessor::Method& method,
+//                   ObjPtr<mirror::Class> klass, ArtMethod* dst)
+extern "C" __attribute__((used))
+void LoadMethodHook(void* class_linker, void* dex_file_ptr, void* class_method_ptr,
+                     void* klass, void* dst) {
+  // Call original first
+  if (!g_load_method_orig) return;
+  auto orig = reinterpret_cast<void (*)(void*, void*, void*, void*, void*)>(g_load_method_orig);
+  orig(class_linker, dex_file_ptr, class_method_ptr, klass, dst);
+  if (!dst || !g_hooks_active.load()) return;
+
+  // Read ArtMethod fields (same offsets as ArtMethodInvokeHook)
+  uintptr_t m = (uintptr_t)dst & 0x00FFFFFFFFFFFFFFULL;
+  if (m == 0) return;
+
+  uint32_t dex_idx = *(const uint32_t*)(m + 0x08);
+  if (dex_idx == 0 || dex_idx == 0xFFFFFFFF) return;
+
+  uint32_t access_flags = *(const uint32_t*)(m + 0x04);
+  if (access_flags & 0x0100) return;  // native
+  if (access_flags & 0x0400) return;  // abstract
+
+  // Read code_item pointer from ptr_sized_fields_.data_ (offset 0x10)
+  uintptr_t data_ptr = *(const uintptr_t*)(m + 0x10);
+  const uint8_t* ci = (const uint8_t*)(data_ptr & ~1ULL);
+  if (ci == nullptr) return;
+
+  // Read code_item header
+  uint16_t regs  = *(const uint16_t*)(ci + 0);
+  uint16_t ins   = *(const uint16_t*)(ci + 2);
+  uint16_t outs  = *(const uint16_t*)(ci + 4);
+  uint16_t tries = *(const uint16_t*)(ci + 6);
+  uint32_t insns = *(const uint32_t*)(ci + 12);
+  if (insns == 0 || insns > 524288) return;
+
+  if (!g_config.enable_codeitem_dump || g_codeitem_dumper == nullptr) return;
+
+  CodeItemDumpTask citask;
+  citask.pid = getpid();
+  citask.tid = (pid_t)syscall(__NR_gettid);
+  citask.method_idx = dex_idx;
+  citask.registers_size = regs;
+  citask.ins_size = ins;
+  citask.outs_size = outs;
+  citask.tries_size = tries;
+  citask.insns_size = insns;
+  citask.dump_size = CodeItemDumper::CalculateCodeItemSize(ci, tries, insns);
+  citask.dump_complete = true;
+  snprintf(citask.source, sizeof(citask.source), "LoadMethod");
+
+  if (citask.CopyData(ci, citask.dump_size)) {
+    int rc = g_codeitem_dumper->QueueDump(citask);
+    if (rc == 0) {
+      LOGI("LoadMethod: queued method_%u (%zu bytes, tries=%u)",
+           dex_idx, citask.dump_size, tries);
+    } else if (rc == 1) {
+      // duplicate, skip
+    } else {
+      LOGW("LoadMethod: queue failed for method_%u (rc=%d)", dex_idx, rc);
+    }
+  }
+}
+
 // ===== Setup Hooks =====
 static bool SetupHooks() {
   if (g_initialized.load()) return true;
@@ -535,6 +605,25 @@ static bool SetupHooks() {
       g_codeitem_dumper = nullptr;
     } else {
       LOGI("✅ CodeItem dumper ready (max=%u)", g_config.max_codeitem_dumps);
+    }
+  }
+
+  // P5: ClassLinker::LoadMethod Hook (always, for reliable code_item capture)
+  {
+    void* load_method_addr = g_resolver->ResolveByName(
+        "_ZN3art11ClassLinker10LoadMethodERKNS_7DexFileERKNS_13ClassAccessor6MethodENS_6ObjPtrINS_6mirror5ClassEEEPNS_9ArtMethodE");
+    if (load_method_addr) {
+      // Initialize the orig function pointer in the hook
+      g_load_method_hook = new Arm64InlineHook();
+      if (g_load_method_hook->Hook(load_method_addr, (void*)LoadMethodHook, &g_load_method_orig)) {
+        LOGI("✅ ClassLinker::LoadMethod hooked at %p", load_method_addr);
+      } else {
+        LOGW("ClassLinker::LoadMethod hook failed");
+        delete g_load_method_hook;
+        g_load_method_hook = nullptr;
+      }
+    } else {
+      LOGW("ClassLinker::LoadMethod NOT FOUND via dlsym");
     }
   }
 
