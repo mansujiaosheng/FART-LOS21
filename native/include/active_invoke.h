@@ -24,7 +24,8 @@ class ActiveInvokeEngine {
   // max_methods: max methods to invoke per class
   void Start(JNIEnv* env, const char* package_name,
              const std::vector<std::string>& classes,
-             uint32_t delay_ms, uint32_t max_methods);
+             uint32_t delay_ms, uint32_t max_methods,
+             bool load_only = false, bool initialize = false);
 
   // Check if currently running
   bool IsRunning() const { return running_.load(); }
@@ -34,6 +35,8 @@ class ActiveInvokeEngine {
   std::vector<std::string> classes_;
   uint32_t delay_ms_ = 1500;
   uint32_t max_methods_ = 200;
+  bool load_only_ = false;       // only load classes, don't invoke methods
+  bool initialize_ = false;      // initialize class (trigger <clinit>)
   std::atomic<bool> running_{false};
   std::thread worker_thread_;
 

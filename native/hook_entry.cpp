@@ -695,7 +695,9 @@ void fart_on_app_specialize(JNIEnv* env, const char* package_name, const char* m
         g_active_invoke_engine->Start(env, package_name,
                                        g_config.active_invoke_classes,
                                        g_config.active_invoke_delay_ms,
-                                       g_config.active_invoke_max_methods);
+                                       g_config.active_invoke_max_methods,
+                                       g_config.active_load_classes,
+                                       g_config.class_init);
       }
     }
   }

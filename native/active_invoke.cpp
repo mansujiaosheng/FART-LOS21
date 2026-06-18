@@ -29,7 +29,8 @@ ActiveInvokeEngine::~ActiveInvokeEngine() {
 
 void ActiveInvokeEngine::Start(JNIEnv* env, const char* package_name,
                                 const std::vector<std::string>& classes,
-                                uint32_t delay_ms, uint32_t max_methods) {
+                                uint32_t delay_ms, uint32_t max_methods,
+                                bool load_only, bool initialize) {
   if (env == nullptr || package_name == nullptr) {
     LOGW("ActiveInvoke: invalid args");
     return;
@@ -41,12 +42,14 @@ void ActiveInvokeEngine::Start(JNIEnv* env, const char* package_name,
   classes_ = classes;
   delay_ms_ = delay_ms;
   max_methods_ = max_methods;
+  load_only_ = load_only;
+  initialize_ = initialize;
 
   running_ = true;
   g_active_invoke_running = 1;
   worker_thread_ = std::thread(&ActiveInvokeEngine::WorkerThread, this);
-  LOGI("ActiveInvoke: started for %s (%zu classes, delay=%ums, max=%u)",
-       package_name_.c_str(), classes_.size(), delay_ms_, max_methods_);
+  LOGI("ActiveInvoke: started for %s (%zu classes, delay=%ums, max=%u, load_only=%d, init=%d)",
+       package_name_.c_str(), classes_.size(), delay_ms_, max_methods_, load_only_, initialize_);
 }
 
 void ActiveInvokeEngine::WorkerThread() {
@@ -113,11 +116,52 @@ int ActiveInvokeEngine::InvokeClassMethods(JNIEnv* env, const std::string& class
     if (c == '.') c = '/';
   }
 
-  // Find class
-  jclass clazz = env->FindClass(internal_name.c_str());
-  if (clazz == nullptr) {
-    LOGW("ActiveInvoke: class not found: %s", class_name.c_str());
-    env->ExceptionClear();
+  // Find class (with or without initialization)
+  jclass clazz = nullptr;
+  if (initialize_) {
+    // Class.forName with initialize=true — triggers <clinit>
+    jstring cls_str = env->NewStringUTF(internal_name.c_str());
+    if (cls_str) {
+      jclass clsClass = env->FindClass("java/lang/Class");
+      jmethodID forName = env->GetStaticMethodID(clsClass, "forName",
+                                                   "(Ljava/lang/String;ZLjava/lang/ClassLoader;)Ljava/lang/Class;");
+      if (forName) {
+        // Get the app's class loader
+        jclass threadClass = env->FindClass("java/lang/Thread");
+        jmethodID currentThread = env->GetStaticMethodID(threadClass, "currentThread",
+                                                          "()Ljava/lang/Thread;");
+        jmethodID getCcl = env->GetMethodID(threadClass, "getContextClassLoader",
+                                              "()Ljava/lang/ClassLoader;");
+        jobject thread = env->CallStaticObjectMethod(threadClass, currentThread);
+        jobject loader = env->CallObjectMethod(thread, getCcl);
+        jstring jname = env->NewStringUTF(internal_name.c_str());
+        clazz = (jclass)env->CallStaticObjectMethod(clsClass, forName, jname, JNI_TRUE, loader);
+        env->DeleteLocalRef(jname);
+        env->DeleteLocalRef(loader);
+        env->DeleteLocalRef(thread);
+      }
+      env->DeleteLocalRef(cls_str);
+    }
+    if (env->ExceptionCheck()) {
+      LOGW("ActiveInvoke: Class.forName(%s, init=true) failed", class_name.c_str());
+      env->ExceptionClear();
+      return 0;
+    }
+  } else {
+    // Class.forName with initialize=false — safe, no <clinit>
+    clazz = env->FindClass(internal_name.c_str());
+    if (clazz == nullptr) {
+      LOGW("ActiveInvoke: class not found (safe load): %s", class_name.c_str());
+      env->ExceptionClear();
+      return 0;
+    }
+  }
+
+  LOGI("ActiveInvoke: loaded class %s", class_name.c_str());
+
+  // If load_only, don't invoke methods
+  if (load_only_) {
+    env->DeleteLocalRef(clazz);
     return 0;
   }
 

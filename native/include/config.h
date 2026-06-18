@@ -24,6 +24,8 @@ struct Config {
 
   // Stage 2.5: Active invoke
   bool enable_active_invoke = false;
+  bool active_load_classes = false;   // P6.2: load classes without invoking
+  bool class_init = false;            // P6.2: initialize class (trigger <clinit>)
   uint32_t active_invoke_delay_ms = 1500;
   uint32_t active_invoke_max_classes = 50;
   uint32_t active_invoke_max_methods = 200;
