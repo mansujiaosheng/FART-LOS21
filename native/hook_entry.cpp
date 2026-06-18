@@ -142,9 +142,32 @@ void* DefineClassHook(void* class_linker, void* thread, const char* descriptor,
   int fd = open(filename, O_CREAT | O_WRONLY | O_TRUNC, 0644);
   if (fd < 0) { LOGE("cannot open %s", filename); return result; }
 
-  // Write in chunks to verify readability during write
+  // Write in chunks, use /proc/self/maps to find actual readable region
   const uint8_t* ptr = begin;
   size_t remaining = dex_size;
+  // Cap to actual mapped region from /proc/self/maps
+  {
+    FILE* mf = fopen("/proc/self/maps", "r");
+    if (mf) {
+      char line[512];
+      while (fgets(line, sizeof(line), mf)) {
+        uintptr_t s, e;
+        char perms[8] = {};
+        if (sscanf(line, "%lx-%lx %7s", &s, &e, perms) >= 3) {
+          uintptr_t b = (uintptr_t)begin;
+          if (perms[0] == 'r' && b >= s && b < e) {
+            size_t max_size = (size_t)(e - b);
+            if (max_size < remaining) {
+              LOGW("Dex: header size=%u, mapped size=%zu, truncating", dex_size, max_size);
+              remaining = max_size;
+            }
+            break;
+          }
+        }
+      }
+      fclose(mf);
+    }
+  }
   bool write_ok = true;
   while (remaining > 0) {
     size_t chunk = (remaining > 65536) ? 65536 : remaining;
