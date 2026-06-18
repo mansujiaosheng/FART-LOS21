@@ -137,14 +137,28 @@ void* DefineClassHook(void* class_linker, void* thread, const char* descriptor,
   uint32_t dex_size = *(const uint32_t*)(begin + 0x20);
   if (dex_size < 64 || dex_size > 0x20000000) { LOGW("invalid size: %u", dex_size); return result; }
 
-  // Use actual mapped size from DexFile::data_ (ArrayRef at offset 0x18)
-  // ArrayRef<const uint8_t>: pointer at +0x18, size at +0x20
-  size_t actual_size = *(size_t*)(dex_obj + 0x20);
-  if (actual_size > 0 && actual_size < dex_size) {
-    LOGI("Dex: begin=%p header_size=%u mapped_size=%zu", begin, dex_size, actual_size);
-    dex_size = (uint32_t)actual_size;
-  } else {
-    LOGI("Dex: begin=%p size=%u", begin, dex_size);
+  // Cap to the first readable mapped segment containing begin_
+  {
+    FILE* mf = fopen("/proc/self/maps", "r");
+    if (mf) {
+      uintptr_t b = (uintptr_t)begin;
+      char line[512];
+      while (fgets(line, sizeof(line), mf)) {
+        uintptr_t s, e;
+        char perms[8] = {};
+        if (sscanf(line, "%lx-%lx %7s", &s, &e, perms) >= 3) {
+          if (perms[0] == 'r' && b >= s && b < e) {
+            size_t max_size = (size_t)(e - b);
+            if (max_size < (size_t)dex_size) {
+              LOGI("Dex: begin=%p header_size=%u mapped_size=%zu", begin, dex_size, max_size);
+              dex_size = (uint32_t)max_size;
+            }
+            break;
+          }
+        }
+      }
+      fclose(mf);
+    }
   }
 
   // Deep copy and write synchronously (to /data/local/tmp/ for SELinux compatibility)
@@ -262,6 +276,9 @@ void ArtMethodInvokeHook(void* art_method, void* thread, uint32_t* args,
                 citask.dump_complete = true;
                 snprintf(citask.source, sizeof(citask.source), "%s",
                          g_active_invoke_running ? "active_invoke" : "ArtMethodInvoke");
+                // Compute dex_key from code_item base (approximate DEX identity)
+                uintptr_t ci_page = (uintptr_t)ci & ~0xFFFULL;
+                snprintf(citask.dex_key, sizeof(citask.dex_key), "%lx", ci_page);
 
                 // Sync memcpy to owned buffer (safe copy)
                 if (citask.CopyData(ci, citask.dump_size)) {
@@ -498,6 +515,9 @@ void LoadMethodHook(void* class_linker, void* dex_file_ptr, void* class_method_p
   citask.outs_size = outs;
   citask.tries_size = tries;
   citask.insns_size = insns;
+  // Compute dex_key from code_item base page
+  uintptr_t ci_page = (uintptr_t)ci & ~0xFFFULL;
+  snprintf(citask.dex_key, sizeof(citask.dex_key), "%lx", ci_page);
   citask.dump_size = CodeItemDumper::CalculateCodeItemSize(ci, tries, insns);
   citask.dump_complete = true;
   snprintf(citask.source, sizeof(citask.source), "LoadMethod");

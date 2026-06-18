@@ -170,6 +170,7 @@ namespace fart {
 CodeItemDumpTask::CodeItemDumpTask() {
   sha256_prefix[0] = '\0';
   source[0] = '\0';
+  dex_key[0] = '\0';
 }
 
 CodeItemDumpTask::~CodeItemDumpTask() {
@@ -419,6 +420,7 @@ bool CodeItemDumper::WriteJsonFile(const CodeItemDumpTask& task) {
   char buf[2048];
   int n = snprintf(buf, sizeof(buf),
       "{\n"
+      "  \"dex_key\": \"%s\",\n"
       "  \"pid\": %d,\n"
       "  \"tid\": %d,\n"
       "  \"method_idx\": %u,\n"
@@ -432,6 +434,7 @@ bool CodeItemDumper::WriteJsonFile(const CodeItemDumpTask& task) {
       "  \"dump_complete\": %s,\n"
       "  \"source\": \"%s\"\n"
       "}\n",
+      task.dex_key,
       task.pid, task.tid,
       task.method_idx, task.sha256_prefix,
       task.registers_size, task.ins_size, task.outs_size,
@@ -500,7 +503,8 @@ bool CodeItemDumper::AppendCsv(const CodeItemDumpTask& task) {
   }
 
   char line[512];
-  int n = snprintf(line, sizeof(line), "%u,%.16s,%u,%zu,%s,%s,%u,%u,%u,%u\n",
+  int n = snprintf(line, sizeof(line), "%s,%u,%.16s,%u,%zu,%s,%s,%u,%u,%u,%u\n",
+                   task.dex_key,
                    task.method_idx, task.sha256_prefix,
                    task.insns_size, task.dump_size,
                    task.dump_complete ? "complete" : "partial",
@@ -533,7 +537,7 @@ void CodeItemDumper::WorkerLoop() {
       snprintf(filename, sizeof(filename), "%s/methods/method_index.csv", dir.c_str());
       int fd = open(filename, O_CREAT | O_WRONLY | O_TRUNC, 0644);
       if (fd >= 0) {
-        const char* header = "method_idx,sha256_prefix,insns_size,dump_size,status,source,registers_size,ins_size,outs_size,tries_size\n";
+        const char* header = "dex_key,method_idx,sha256_prefix,insns_size,dump_size,status,source,registers_size,ins_size,outs_size,tries_size\n";
         write(fd, header, strlen(header));
         close(fd);
       }

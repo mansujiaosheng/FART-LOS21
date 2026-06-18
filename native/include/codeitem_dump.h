@@ -32,6 +32,9 @@ struct CodeItemDumpTask {
   // Source of this dump: "ArtMethodInvoke" or "active_invoke"
   char source[32];
 
+  // DexFile identifier: sha1(begin[0:4096] + dex_size)[:16] hex
+  char dex_key[17];
+
   CodeItemDumpTask();
   ~CodeItemDumpTask();
 
@@ -54,6 +57,7 @@ struct CodeItemDumpTask {
         data(other.data) {
     memcpy(sha256_prefix, other.sha256_prefix, 17);
     memcpy(source, other.source, 32);
+    memcpy(dex_key, other.dex_key, 17);
     other.data = nullptr;
     other.dump_size = 0;
   }
@@ -74,6 +78,7 @@ struct CodeItemDumpTask {
       data = other.data;
       memcpy(sha256_prefix, other.sha256_prefix, 17);
       memcpy(source, other.source, 32);
+      memcpy(dex_key, other.dex_key, 17);
       other.data = nullptr;
       other.dump_size = 0;
     }
