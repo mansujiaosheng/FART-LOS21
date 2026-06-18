@@ -6,6 +6,9 @@ import java.io.File;
 import java.io.FileWriter;
 
 public class RootShell {
+    // Customizable su command template: %s is replaced with the actual command
+    public static String suCmd = "kp -c";
+
     public static String exec(String cmd) {
         StringBuilder out = new StringBuilder();
         try {
@@ -22,7 +25,7 @@ public class RootShell {
     }
 
     public static String su(String cmd) {
-        return exec("kp -c '" + cmd.replace("'", "'\\''") + "'");
+        return exec(suCmd + " '" + cmd.replace("'", "'\\''") + "'");
     }
 
     public static boolean isModuleInstalled() {
@@ -49,9 +52,8 @@ public class RootShell {
 
     public static String getStats() {
         String d = su("ls /data/local/tmp/fart_dump/*.dex 2>/dev/null | wc -l || echo 0");
-        String j = su("ls /data/local/tmp/fart_dump/methods/*.json 2>/dev/null | wc -l || echo 0");
         String c = su("ls /data/local/tmp/fart_dump/methods/*.code 2>/dev/null | wc -l || echo 0");
-        return d.trim() + "|" + j.trim() + "|" + c.trim();
+        return d.trim() + "|0|" + c.trim();
     }
 
     public static boolean exportDump(String pkg) {

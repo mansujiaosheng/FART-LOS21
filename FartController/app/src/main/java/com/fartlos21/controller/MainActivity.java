@@ -2,8 +2,10 @@ package com.fartlos21.controller;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.os.Handler;
+import android.text.InputType;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -107,8 +109,94 @@ public class MainActivity extends Activity {
         root.addView(refreshBtn);
         refreshBtn.setOnClickListener(v -> refresh());
 
+        // Settings button
+        Button settingsBtn = new Button(this);
+        settingsBtn.setText("⚙ Root 设置");
+        settingsBtn.setTextSize(12);
+        settingsBtn.setGravity(Gravity.CENTER);
+        root.addView(settingsBtn);
+        settingsBtn.setOnClickListener(v -> showSettings());
+
         setContentView(scroll);
+        loadSuCmd();
         refresh();
+    }
+
+    private void loadSuCmd() {
+        SharedPreferences prefs = getPreferences(MODE_PRIVATE);
+        RootShell.suCmd = prefs.getString("su_cmd", "kp -c");
+    }
+
+    private void showSettings() {
+        final String[] presets = {"kp -c", "su -c", "su -c", "tsu"};
+        final String[] labels = {"APatch (kp -c)", "Magisk (su -c)", "SuperSU (su -c)", "Termux (tsu)"};
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(40, 20, 40, 20);
+
+        TextView hint = new TextView(this);
+        hint.setText("选择 Root 命令：");
+        hint.setTextSize(14);
+        layout.addView(hint);
+
+        final RadioGroup rg = new RadioGroup(this);
+        rg.setOrientation(RadioGroup.VERTICAL);
+        int checkedId = -1;
+        for (int i = 0; i < presets.length; i++) {
+            RadioButton rb = new RadioButton(this);
+            rb.setText(labels[i]);
+            rb.setId(i);
+            rg.addView(rb);
+            if (RootShell.suCmd.equals(presets[i])) checkedId = i;
+        }
+        // Custom radio
+        final RadioButton customRb = new RadioButton(this);
+        customRb.setText("自定义");
+        customRb.setId(99);
+        rg.addView(customRb);
+        if (checkedId == -1) {
+            customRb.setChecked(true);
+            checkedId = 99;
+        } else {
+            rg.check(checkedId);
+        }
+        layout.addView(rg);
+
+        final EditText customInput = new EditText(this);
+        customInput.setHint("例如: su -c");
+        customInput.setInputType(InputType.TYPE_CLASS_TEXT);
+        if (checkedId == -1) {
+            customInput.setText(RootShell.suCmd);
+            customInput.setVisibility(View.VISIBLE);
+        } else {
+            customInput.setVisibility(View.GONE);
+        }
+        layout.addView(customInput);
+
+        rg.setOnCheckedChangeListener((group, id) -> {
+            customInput.setVisibility(id == 99 ? View.VISIBLE : View.GONE);
+        });
+
+        new AlertDialog.Builder(this)
+            .setTitle("Root 设置")
+            .setView(layout)
+            .setPositiveButton("确定", (dialog, which) -> {
+                String cmd;
+                if (customRb.isChecked()) {
+                    cmd = customInput.getText().toString().trim();
+                    if (cmd.isEmpty()) cmd = "kp -c";
+                } else {
+                    int id = rg.getCheckedRadioButtonId();
+                    cmd = presets[id];
+                }
+                RootShell.suCmd = cmd;
+                SharedPreferences prefs = getPreferences(MODE_PRIVATE);
+                prefs.edit().putString("su_cmd", cmd).apply();
+                Toast.makeText(this, "Root 命令已设为: " + cmd, Toast.LENGTH_SHORT).show();
+                refresh();
+            })
+            .setNegativeButton("取消", null)
+            .show();
     }
 
     private void showAppList() {
