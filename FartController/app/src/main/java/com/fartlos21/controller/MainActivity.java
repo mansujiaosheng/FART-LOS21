@@ -120,7 +120,7 @@ public class MainActivity extends Activity {
     }
 
     private void showSettings() {
-        final String[] presets = {"kp -c", "su -c", "su -c", "tsu"};
+        final String[] presets = {"/system/bin/kp -c", "/system/bin/su -c", "/system/xbin/su -c", "/data/data/com.termux/files/usr/bin/tsu"};
         final String[] labels = {"APatch (kp -c)", "Magisk (su -c)", "SuperSU (su -c)", "Termux (tsu)"};
         LinearLayout layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
