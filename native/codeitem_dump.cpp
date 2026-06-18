@@ -169,6 +169,7 @@ namespace fart {
 
 CodeItemDumpTask::CodeItemDumpTask() {
   sha256_prefix[0] = '\0';
+  source[0] = '\0';
 }
 
 CodeItemDumpTask::~CodeItemDumpTask() {

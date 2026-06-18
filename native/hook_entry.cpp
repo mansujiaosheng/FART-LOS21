@@ -136,9 +136,16 @@ void* DefineClassHook(void* class_linker, void* thread, const char* descriptor,
   // Read file_size from header (offset 0x20)
   uint32_t dex_size = *(const uint32_t*)(begin + 0x20);
   if (dex_size < 64 || dex_size > 0x20000000) { LOGW("invalid size: %u", dex_size); return result; }
-  if (!IsRangeReadable(begin, dex_size)) { LOGW("data not fully readable"); return result; }
 
-  LOGI("Dex: begin=%p size=%u", begin, dex_size);
+  // Use actual mapped size from DexFile::data_ (ArrayRef at offset 0x18)
+  // ArrayRef<const uint8_t>: pointer at +0x18, size at +0x20
+  size_t actual_size = *(size_t*)(dex_obj + 0x20);
+  if (actual_size > 0 && actual_size < dex_size) {
+    LOGI("Dex: begin=%p header_size=%u mapped_size=%zu", begin, dex_size, actual_size);
+    dex_size = (uint32_t)actual_size;
+  } else {
+    LOGI("Dex: begin=%p size=%u", begin, dex_size);
+  }
 
   // Deep copy and write synchronously (to /data/local/tmp/ for SELinux compatibility)
   pid_t pid = getpid();
@@ -151,32 +158,9 @@ void* DefineClassHook(void* class_linker, void* thread, const char* descriptor,
   int fd = open(filename, O_CREAT | O_WRONLY | O_TRUNC, 0644);
   if (fd < 0) { LOGE("cannot open %s", filename); return result; }
 
-  // Write in chunks, use /proc/self/maps to find actual readable region
+  // Write in chunks
   const uint8_t* ptr = begin;
   size_t remaining = dex_size;
-  // Cap to actual mapped region from /proc/self/maps
-  {
-    FILE* mf = fopen("/proc/self/maps", "r");
-    if (mf) {
-      char line[512];
-      while (fgets(line, sizeof(line), mf)) {
-        uintptr_t s, e;
-        char perms[8] = {};
-        if (sscanf(line, "%lx-%lx %7s", &s, &e, perms) >= 3) {
-          uintptr_t b = (uintptr_t)begin;
-          if (perms[0] == 'r' && b >= s && b < e) {
-            size_t max_size = (size_t)(e - b);
-            if (max_size < remaining) {
-              LOGW("Dex: header size=%u, mapped size=%zu, truncating", dex_size, max_size);
-              remaining = max_size;
-            }
-            break;
-          }
-        }
-      }
-      fclose(mf);
-    }
-  }
   bool write_ok = true;
   while (remaining > 0) {
     size_t chunk = (remaining > 65536) ? 65536 : remaining;
@@ -612,6 +596,10 @@ static bool SetupHooks() {
   {
     void* load_method_addr = g_resolver->ResolveByName(
         "_ZN3art11ClassLinker10LoadMethodERKNS_7DexFileERKNS_13ClassAccessor6MethodENS_6ObjPtrINS_6mirror5ClassEEEPNS_9ArtMethodE");
+    // Fallback: offset from device libart.so (readelf -s result)
+    if (!load_method_addr) {
+      load_method_addr = g_resolver->ResolveByOffset(0x2d4510);
+    }
     if (load_method_addr) {
       // Initialize the orig function pointer in the hook
       g_load_method_hook = new Arm64InlineHook();

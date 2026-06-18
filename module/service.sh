@@ -26,9 +26,21 @@ while true; do
     chmod 755 "$FART_DIR/libfart-hook.so" 2>/dev/null
     chcon u:object_r:system_lib_file:s0 "$FART_DIR/libfart-hook.so" 2>/dev/null
 
+    # Find the actual dump directory from config
+    DEX_DIR="$FART_DIR"
+    if [ -f "$MODPATH/config/config.json" ] && grep -q '"packages"' "$MODPATH/config/config.json" 2>/dev/null; then
+        FIRST_PKG=$(grep -o '"packages":\["[^"]*"' "$MODPATH/config/config.json" 2>/dev/null | sed 's/"packages":\["//;s/"//')
+        if [ -n "$FIRST_PKG" ]; then
+            APP_DEX_DIR="/data/data/$FIRST_PKG/files/fart_dump"
+            if [ -d "$APP_DEX_DIR" ]; then
+                DEX_DIR="$APP_DEX_DIR"
+            fi
+        fi
+    fi
+
     # Write stats for the app
-    dex_count=$(ls /data/local/tmp/fart_dump/*.dex 2>/dev/null | wc -l)
-    code_count=$(ls /data/local/tmp/fart_dump/methods/*.code 2>/dev/null | wc -l)
+    dex_count=$(ls "$DEX_DIR"/*.dex /data/local/tmp/fart_dump/*.dex 2>/dev/null | wc -l)
+    code_count=$(ls "$DEX_DIR"/methods/*.code /data/local/tmp/fart_dump/methods/*.code 2>/dev/null | wc -l)
     {
         echo "dex:$dex_count"
         echo "code:$code_count"
@@ -66,8 +78,10 @@ while true; do
     # Poll for config written by the app
     if [ -f "$CTRL_DIR/config.json" ]; then
         if grep -q '"enable"[[:space:]]*:[[:space:]]*true' "$CTRL_DIR/config.json" 2>/dev/null; then
-            rm -f /data/local/tmp/fart_dump/*.dex 2>/dev/null
-            rm -f /data/local/tmp/fart_dump/methods/* 2>/dev/null
+            rm -f /data/local/tmp/fart_dump/*.dex /data/local/tmp/fart_dump/methods/* 2>/dev/null
+            if [ "$DEX_DIR" != "/data/local/tmp/fart_dump" ]; then
+                rm -f "$DEX_DIR"/*.dex "$DEX_DIR"/methods/* 2>/dev/null
+            fi
             echo "已允许脱壳，等待目标应用启动" > "$FART_DIR/status"
             rm -f "$FART_DIR/last_auto_export" 2>/dev/null
             rm -f "$FART_DIR/last_dump_count" 2>/dev/null

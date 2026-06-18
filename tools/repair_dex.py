@@ -255,7 +255,7 @@ def load_code_items(code_dir):
     items = {}
     csv_path = os.path.join(code_dir, 'method_index.csv')
     if os.path.exists(csv_path):
-        with open(csv_path) as f:
+        with open(csv_path, 'r', errors='replace') as f:
             for line in f:
                 if line.startswith('method_idx'):
                     continue
