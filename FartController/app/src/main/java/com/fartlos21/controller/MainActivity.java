@@ -258,7 +258,7 @@ public class MainActivity extends Activity {
         json.append("\"dump_dir\":\"/data/local/tmp/fart_dump\",\"dump_dex\":true,");
         json.append("\"enable_artmethod_hook\":true,\"artmethod_sample_rate\":100,");
         json.append("\"enable_codeitem_dump\":true,\"max_codeitem_dumps\":2000,");
-        json.append("\"enable_active_invoke\":true,");
+        json.append("\"enable_active_invoke\":false,");
         json.append("\"active_invoke_delay_ms\":1000,\"active_invoke_max_methods\":500,");
         json.append("\"active_invoke_skip_execute\":true,");
         json.append("\"active_invoke_classes\":[]}");

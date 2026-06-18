@@ -3,6 +3,7 @@
     package="com.fartlos21.controller">
 
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <uses-sdk android:minSdkVersion="34" android:targetSdkVersion="34" />
 
