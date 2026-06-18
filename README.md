@@ -27,11 +27,13 @@
 
 | 功能 | 说明 |
 |------|------|
-| **Dex Only** | Hook `DefineClass`，拦截新加载的 dex 并 dump 到文件 |
+| **DexFile Dump** | Hook `DefineClass`，拦截新加载的 dex 并 dump 到文件 |
 | **已加载 DEX 快照** | 通过 Java 反射枚举 `BaseDexClassLoader` 中的已加载 dex 文件 |
 | **CodeItem Dump** | Hook `ArtMethod::Invoke`，采样时提取方法的 CodeItem 元数据 |
-| **Active Invoke** | JNI 反射方式主动调用目标方法，触发 CodeItem 解析 |
-| **FartController** | Android 可视化控制器 App，三种模式一键切换 |
+| **内存映射感知** | 通过 `/proc/self/maps` 检测实际可读区域，防止写超出映射范围 |
+| **FartController** | Android 可视化控制器 App，一键允许/关闭脱壳 |
+| **自动导出** | service.sh 自动搬运 DEX 文件到 `/sdcard/FART-LOS21/<包名>/` |
+| **SHA256 去重** | 自动导出时通过 hash 去重，避免重复文件 |
 
 ---
 
@@ -44,13 +46,19 @@ fart-los21/
 │   │   ├── AndroidManifest.xml
 │   │   ├── java/com/fartlos21/controller/
 │   │   │   ├── MainActivity.java    # 主界面 + 应用列表 + 配置生成
-│   │   │   └── RootShell.java       # kp root 命令 + 文件操作
+│   │   │   └── RootShell.java       # 本地文件操作 + 状态管理
 │   │   └── res/values/strings.xml
 │   ├── build.sh              # 一键编译脚本
-│   ├── build_simple.py       # 二进制 AXML 生成器
+│   ├── build_simple.py       # 二进制 AXML 生成器（备用）
 │   └── build/                # 编译输出（gitignore）
 ├── module/                   # APatch/Zygisk 模块元数据
-├── config/                   # 运行时 config.json
+│   ├── module.prop
+│   ├── service.sh            # 后台守护：配置搬运 + 心跳 + 自动导出
+│   ├── customize.sh
+│   ├── sepolicy.rule
+│   ├── zygisk/arm64-v8a.so   # Zygisk 加载器
+│   └── lib64/libfart-hook.so # Hook 核心库
+├── config/                   # 默认 config.json
 ├── native/                   # Native hook 核心源码
 │   ├── include/              # C++ 头文件
 │   ├── zygisk_loader.cpp     # Zygisk 加载器（最小 STL 依赖）
@@ -79,8 +87,7 @@ fart-los21/
 - NDK r27（`/lina_android/android-ndk-r27`）
 - Java 8+（javac、keytool）
 - Python 3
-- `aapt2`（Android SDK build-tools，可选，用于资源编译）
-- `apksigner`（LineageOS 预置或 Android SDK）
+- Android SDK（aapt2、d8、android.jar）
 
 ---
 
@@ -91,7 +98,6 @@ fart-los21/
 ```bash
 cd fart-los21/native
 make clean && make -j4
-make zygisk
 ```
 
 输出：
@@ -110,28 +116,14 @@ scripts/package_module.sh
 ### 3. 安装模块
 
 ```bash
-# 推送模块
-adb push fart-los21-module.zip /data/local/tmp/
-adb push config/config.json /data/local/tmp/
+adb -H <设备IP> -P 5037 push fart-los21-module.zip /data/local/tmp/
+adb -H <设备IP> -P 5037 shell kp -c "apd module install /data/local/tmp/fart-los21-module.zip"
 
-# APatch 安装
-adb shell 'kp -c "apd module install /data/local/tmp/fart-los21-module.zip"'
-
-# 安装 ZygiskNext
-adb push ZygiskNext-*.zip /data/local/tmp/
-adb shell 'kp -c "apd module install /data/local/tmp/ZygiskNext-*.zip"'
-
-# 初始化 dump 目录
-adb shell 'kp -c "mkdir -p /data/local/tmp/fart /data/local/tmp/fart_dump"'
-adb shell 'kp -c "chmod 777 /data/local/tmp/fart /data/local/tmp/fart_dump"'
-adb shell 'kp -c "chcon u:object_r:system_lib_file:s0 /data/local/tmp/fart/libfart-hook.so"'
-adb shell 'kp -c "chcon u:object_r:app_data_file:s0 /data/local/tmp/fart_dump"'
-
-# 设置 system linker 模式
-adb shell 'kp -c "znctl linker system"'
+# 设置 system linker 模式（必须！否则模块不会注入）
+adb -H <设备IP> -P 5037 shell kp -c "znctl linker system"
 
 # 重启
-adb reboot
+adb -H <设备IP> -P 5037 reboot
 ```
 
 ### 4. 构建并安装 FartController
@@ -139,15 +131,8 @@ adb reboot
 ```bash
 cd fart-los21/FartController
 bash build.sh
+adb -H <设备IP> -P 5037 install -t FartController/build/FARTController.apk
 ```
-
-输出 `FartController/build/FARTController.apk`（约 13KB），然后：
-
-```bash
-adb install -t FartController/build/FARTController.apk
-```
-
-> **注意**：如果 `adb install` 报 `INSTALL_FAILED_NO_MATCHING_ABIS`，请确保编译环境有 Java 8+ 且 `aapt2`/`dx` 路径正确。
 
 ---
 
@@ -155,81 +140,71 @@ adb install -t FartController/build/FARTController.apk
 
 ### 主界面
 
-打开名为 **FART控制器** 的 App，界面包含：
+打开名为 **FART控制器** 的 App：
 
 | 控件 | 说明 |
 |------|------|
-| **模块状态** | 显示 ✓ 已安装 或 ✗ 未找到 |
-| **刷新** | 重新检测模块状态和 dump 统计 |
-| **选择应用** | 弹出列表，选择目标非系统应用 |
-| **模式选择** | Dex Only / CodeItem / Active Invoke |
-| **写入并启动** | 生成 config.json → 写入模块目录 → force-stop → monkey 启动 |
-| **统计** | 显示 Dex / JSON / Code 文件计数 |
-| **导出到 /sdcard** | 将 dump 文件复制到 `/sdcard/FART-LOS21/<包名>/` |
+| **模块状态** | 显示 ✓ 已安装 或 ✗ 未检测到 |
+| **选择目标应用** | 弹出列表，选择要脱壳的非系统应用 |
+| **允许脱壳** | 一键写入配置，service.sh 自动 force-stop 目标应用 |
+| **关闭脱壳** | 恢复目标应用正常启动 |
+| **统计** | 显示当前 Dex / CodeItem 文件计数 |
+| **导出 DEX** | 手动触发导出到 `/sdcard/FART-LOS21/<包名>/` |
+| **自动导出** | 文件稳定后自动复制到 sdcard |
 
-### 三种模式详解
+### 工作流程
 
-#### Dex Only
-- Hook `DefineClass` 拦截新加载的 dex
-- 不启用 `ArtMethod::Invoke` hook
-- 适合快速验证和基础 dex dump
+```text
+FartController 点"允许脱壳"
+  ├─ 写入 config.json 到 /data/data/.../files/
+  ├─ 写入 .launch_trigger 到 /data/data/.../files/
+  └─ Toast 提示"已停止，重新打开即可自动脱壳"
 
-#### CodeItem
-- 启用 `DefineClass` + `ArtMethod::Invoke` 双 hook
-- `ArtMethod::Invoke` 以 1:100 采样率记录方法调用
-- 提取 CodeItem 元数据（registers_size、ins_size、outs_size、tries_size、insns_size）
-- 将 CodeItem 二进制数据写入 `methods/*.code` 目录
+service.sh（每 2 秒轮询）
+  ├─ 检测到 config.json → 复制到模块目录 + /data/local/tmp/fart/
+  ├─ 检测到 .launch_trigger → am force-stop 目标应用
+  └─ 检测到 .export_trigger → SHA256 去重复制到 /sdcard/
 
-#### Active Invoke
-- 在以上基础上启用**主动调用引擎**
-- 通过 JNI 反射方式主动调用目标类构造方法
-- 可选：设置目标类名（每行一个）、最大方法数、延迟
-- 勾选「跳过执行」可以在 dump 后不实际执行方法体
-- 适合深度修复场景（类方法需要被调用才能加载 CodeItem）
-
-### 测试示例
-
-```bash
-# 清理旧 dump
-adb shell 'kp -c "rm -f /data/local/tmp/fart_dump/*.dex"'
-adb shell 'kp -c "logcat -c"'
-
-# 打开 FartController → 选择应用 → Dex Only → 写入并启动
-
-# 查看日志
-adb logcat -d | grep FART_LOS21
-
-# 拉取 dump 文件
-adb shell 'kp -c "cp /data/local/tmp/fart_dump/*.dex /data/local/tmp/ && chmod 644 /data/local/tmp/*.dex"'
-adb pull /data/local/tmp/dex_*.dex ./
-
-# 反编译
-jadx dex_*.dex -d output/
+用户手动打开目标应用
+  └─ 全新进程 → Zygisk 注入 → hook DefineClass → dump DEX
 ```
+
+### 使用步骤
+
+1. 打开 **FART控制器**
+2. 点 **选择目标应用** → 选一个非系统 app
+3. 点 **允许脱壳** → 等待 toast
+4. 等 2-3 秒让 service.sh 完成配置搬运 + force-stop
+5. 从桌面**手动打开**目标应用
+6. 等待 dex 文件生成（统计数字会增加）
+7. 点 **导出 DEX** 或等自动导出
+8. 到 `/sdcard/FART-LOS21/<包名>/` 取文件
 
 ---
 
-## 配置文件格式
+## 架构说明
 
-模块通过 `config/config.json` 控制行为。FartController 会自动生成此文件，也可手动编辑：
+### 配置桥接
 
-```json
-{
-  "enable": true,
-  "packages": ["com.example.target"],
-  "dump_dir": "/data/local/tmp/fart_dump",
-  "dump_dex": true,
-  "enable_artmethod_hook": false,
-  "artmethod_sample_rate": 1000,
-  "enable_codeitem_dump": false,
-  "max_codeitem_dumps": 500,
-  "enable_active_invoke": false,
-  "active_invoke_delay_ms": 1500,
-  "active_invoke_max_methods": 200,
-  "active_invoke_skip_execute": true,
-  "active_invoke_classes": []
-}
+App 进程由于 Android 14 mount namespace 隔离，无法访问 `/system/bin/kp` 和 `/data/adb/modules/`。因此采用 **service.sh 桥接**模式：
+
+```text
+App 写 /data/data/.../files/config.json
+         │
+         ▼ service.sh 每 2 秒轮询（以 root 运行）
+         │
+         ▼
+  复制到 /data/adb/modules/fart-los21/config/config.json  (模块目录)
+  复制到 /data/local/tmp/fart/config.json                  (loader 备用路径)
 ```
+
+### DEX 写入保护
+
+Android 14 ART 可能对 DEX 文件进行 mmap 映射，此时 header 中的 `file_size` 可能大于实际映射范围。hook 在写入前扫描 `/proc/self/maps`，取实际可读区域大小进行写入，避免文件截断。
+
+### SELinux
+
+Hook 库 `libfart-hook.so` 需要 `system_lib_file` 的 SELinux context 才能被 app 进程 `dlopen`。service.sh 在每次启动时执行 `chcon` 确保 context 正确。
 
 ---
 
@@ -237,10 +212,12 @@ jadx dex_*.dex -d output/
 
 | 问题 | 检查点 |
 |------|--------|
-| 模块状态显示未安装 | `adb shell kp -c "ls /data/adb/modules/fart-los21/"` |
-| 没有 dump 文件 | 检查 logcat: `adb logcat -d | grep FART_LOS21` |
-| 应用崩溃 | `scripts/collect_crashlog.sh`，禁用模块后排查 |
-| FartController 无法写入配置 | 确认 `kp` root 命令可用: `adb shell kp -c "id"` |
+| 模块状态显示未安装 | 确认已执行 `znctl linker system` 并重启 |
+| 点击允许脱壳后 app 闪退 | 检查 logcat: `adb logcat -d | grep FART_LOS21` |
+| 没有 dump 文件 | 确认已手动打开目标应用（非桌面缓存恢复） |
+| DEX 文件无法用 jadx 打开 | 确认已更新最新 hook lib（含 maps 截断保护） |
+| dlopen permission denied | 检查 SELinux context: `ls -laZ /data/local/tmp/fart/libfart-hook.so` |
+| 导出提示"未发现 dump 文件" | 文件可能已被 auto-export 搬走，直接去 sdcard 目录检查 |
 | 黑屏/循环重启 | `adb shell kp -c "touch /data/adb/modules/fart-los21/disable"` 再重启 |
 
 ---
