@@ -42,6 +42,30 @@ public class RootShell {
         }
     }
 
+    public static boolean writeLocalStatus(String status) {
+        try {
+            FileWriter f = new FileWriter(dataDir + "/.dump_status");
+            f.write(status);
+            f.close();
+            return true;
+        } catch (Exception e) {
+            Log.e(TAG, "writeLocalStatus failed", e);
+            return false;
+        }
+    }
+
+    public static boolean writeAutoExport(String pkg, String exportDir) {
+        try {
+            FileWriter f = new FileWriter(dataDir + "/.auto_export");
+            f.write(pkg + "|" + exportDir);
+            f.close();
+            return true;
+        } catch (Exception e) {
+            Log.e(TAG, "writeAutoExport failed", e);
+            return false;
+        }
+    }
+
     /** Check heartbeat file written by service.sh */
     public static boolean isModuleInstalled() {
         boolean ok = new File(dataDir + "/.module_heartbeat").exists();
@@ -54,6 +78,20 @@ public class RootShell {
         exec("am force-stop " + pkg + " 2>/dev/null");
         String r = exec("monkey -p " + pkg + " 1 2>/dev/null");
         return r.contains("Events injected");
+    }
+
+    /** Write launch trigger for service.sh (root) to execute */
+    public static boolean writeLaunchTrigger(String pkg) {
+        try {
+            FileWriter f = new FileWriter(dataDir + "/.launch_trigger");
+            f.write(pkg);
+            f.close();
+            Log.d(TAG, "launch trigger written for " + pkg);
+            return true;
+        } catch (Exception e) {
+            Log.e(TAG, "launch trigger failed", e);
+            return false;
+        }
     }
 
     /** Read stats from heartbeat file written by service.sh */
@@ -71,17 +109,64 @@ public class RootShell {
         return dex + "|0|" + code;
     }
 
-    /** Export via service.sh helper — writes a trigger file */
-    public static boolean exportDump(String pkg) {
+    public static String getDumpStatus() {
         try {
+            BufferedReader r = new BufferedReader(new FileReader(dataDir + "/.dump_status"));
+            String l = r.readLine();
+            r.close();
+            return l == null ? "" : l;
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
+    /** Export via service.sh helper — writes a trigger file */
+    public static boolean exportDump(String pkg, String exportDir) {
+        try {
+            new File(dataDir + "/.export_status").delete();
             FileWriter f = new FileWriter(dataDir + "/.export_trigger");
-            f.write(pkg);
+            f.write(pkg + "|" + exportDir);
             f.close();
             Log.d(TAG, "export trigger written");
             return true;
         } catch (Exception e) {
             Log.e(TAG, "export failed", e);
             return false;
+        }
+    }
+
+    public static String getExportStatus() {
+        try {
+            BufferedReader r = new BufferedReader(new FileReader(dataDir + "/.export_status"));
+            String l = r.readLine();
+            r.close();
+            return l == null ? "" : l;
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
+    public static boolean requestLogExport(String exportDir) {
+        try {
+            new File(dataDir + "/.log_export_status").delete();
+            FileWriter f = new FileWriter(dataDir + "/.log_export_trigger");
+            f.write(exportDir);
+            f.close();
+            return true;
+        } catch (Exception e) {
+            Log.e(TAG, "requestLogExport failed", e);
+            return false;
+        }
+    }
+
+    public static String getLogExportStatus() {
+        try {
+            BufferedReader r = new BufferedReader(new FileReader(dataDir + "/.log_export_status"));
+            String l = r.readLine();
+            r.close();
+            return l == null ? "" : l;
+        } catch (Exception e) {
+            return "";
         }
     }
 }
