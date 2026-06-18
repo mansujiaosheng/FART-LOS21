@@ -1,16 +1,17 @@
 package com.fartlos21.controller;
 
 import java.io.BufferedReader;
-import java.io.InputStreamReader;
 import java.io.File;
+import java.io.FileReader;
 import java.io.FileWriter;
+import java.io.InputStreamReader;
 import android.util.Log;
 
 public class RootShell {
     private static final String TAG = "FART_CTRL";
 
-    // Customizable su command (use full path — app process PATH may differ)
-    public static String suCmd = "/system/bin/kp -c";
+    // App's internal files dir, set from MainActivity onCreate
+    public static String dataDir = "";
 
     public static String exec(String cmd) {
         StringBuilder out = new StringBuilder();
@@ -20,71 +21,67 @@ public class RootShell {
             String l;
             while ((l = r.readLine()) != null) out.append(l).append("\n");
             r.close();
-            BufferedReader er = new BufferedReader(new InputStreamReader(p.getErrorStream()));
-            StringBuilder err = new StringBuilder();
-            while ((l = er.readLine()) != null) err.append(l).append("\n");
-            er.close();
             p.waitFor();
-            int exit = p.exitValue();
-            if (exit != 0 || err.length() > 0) {
-                Log.w(TAG, "exec exit=" + exit + " stderr=[" + err.toString().trim()
-                    + "] cmd=[" + cmd.substring(0, Math.min(cmd.length(), 200)) + "]");
-            }
         } catch (Exception e) {
             Log.e(TAG, "exec exception", e);
-            out.append("ERR:").append(e.getMessage());
         }
         return out.toString().trim();
     }
 
-    public static String su(String cmd) {
-        String full = suCmd + " '" + cmd.replace("'", "'\\''") + "'";
-        Log.d(TAG, "su cmd=" + full.substring(0, Math.min(full.length(), 300)));
-        String r = exec(full);
-        Log.d(TAG, "su result=[" + r + "]");
-        return r;
-    }
-
-    public static boolean isModuleInstalled() {
-        String r = su("ls /data/adb/modules/fart-los21/ 2>/dev/null || echo N");
-        boolean ok = !r.contains("N");
-        Log.d(TAG, "isModuleInstalled=" + ok);
-        return ok;
-    }
-
+    /** Write config to app's own data dir; service.sh polls and copies to module dir */
     public static boolean writeConfig(String json) {
         try {
-            byte[] data = json.getBytes("UTF-8");
-            String b64 = android.util.Base64.encodeToString(data, android.util.Base64.NO_WRAP);
-            Log.d(TAG, "writeConfig json=" + json.substring(0, Math.min(json.length(), 200)));
-            Log.d(TAG, "writeConfig b64=" + b64);
-            String cmd = "echo '" + b64 + "' | base64 -d > /data/adb/modules/fart-los21/config/config.json && chmod 644 /data/adb/modules/fart-los21/config/config.json && echo Y || echo N";
-            String r = su(cmd);
-            Log.d(TAG, "writeConfig result=[" + r + "]");
-            return r.contains("Y");
+            FileWriter f = new FileWriter(dataDir + "/config.json");
+            f.write(json);
+            f.close();
+            Log.d(TAG, "writeConfig OK to " + dataDir + "/config.json");
+            return true;
         } catch (Exception e) {
-            Log.e(TAG, "writeConfig exception", e);
+            Log.e(TAG, "writeConfig failed", e);
             return false;
         }
     }
 
+    /** Check heartbeat file written by service.sh */
+    public static boolean isModuleInstalled() {
+        boolean ok = new File(dataDir + "/.module_heartbeat").exists();
+        Log.d(TAG, "isModuleInstalled=" + ok);
+        return ok;
+    }
+
+    /** Launch target app via am/monkey (may work without root on some ROMs) */
     public static boolean launchApp(String pkg) {
-        String r = su("am force-stop " + pkg + " 2>/dev/null; monkey -p " + pkg + " 1 2>/dev/null || am start -n " + pkg + "/.MainActivity 2>/dev/null; echo OK");
-        return r.contains("OK");
+        exec("am force-stop " + pkg + " 2>/dev/null");
+        String r = exec("monkey -p " + pkg + " 1 2>/dev/null");
+        return r.contains("Events injected");
     }
 
+    /** Read stats from heartbeat file written by service.sh */
     public static String getStats() {
-        String d = su("ls /data/local/tmp/fart_dump/*.dex 2>/dev/null | wc -l || echo 0");
-        String c = su("ls /data/local/tmp/fart_dump/methods/*.code 2>/dev/null | wc -l || echo 0");
-        return d.trim() + "|0|" + c.trim();
+        String dex = "0", code = "0";
+        try {
+            BufferedReader r = new BufferedReader(new FileReader(dataDir + "/.stats"));
+            String l;
+            while ((l = r.readLine()) != null) {
+                if (l.startsWith("dex:")) dex = l.substring(4);
+                if (l.startsWith("code:")) code = l.substring(5);
+            }
+            r.close();
+        } catch (Exception e) {}
+        return dex + "|0|" + code;
     }
 
+    /** Export via service.sh helper — writes a trigger file */
     public static boolean exportDump(String pkg) {
-        String dir = "/sdcard/FART-LOS21/" + pkg + "/";
-        su("mkdir -p " + dir + "methods");
-        su("cp /data/local/tmp/fart_dump/*.dex " + dir + " 2>/dev/null");
-        su("cp /data/local/tmp/fart_dump/methods/* " + dir + "methods/ 2>/dev/null");
-        su("chmod -R 644 " + dir + "* 2>/dev/null");
-        return true;
+        try {
+            FileWriter f = new FileWriter(dataDir + "/.export_trigger");
+            f.write(pkg);
+            f.close();
+            Log.d(TAG, "export trigger written");
+            return true;
+        } catch (Exception e) {
+            Log.e(TAG, "export failed", e);
+            return false;
+        }
     }
 }
