@@ -16,8 +16,13 @@
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 #define LOGW(...) __android_log_print(ANDROID_LOG_WARN, LOG_TAG, __VA_ARGS__)
 
-static const char* kHookLib = "/data/local/tmp/fart/libfart-hook.so";
-static const char* kConfigPath = "/data/local/tmp/fart/config.json";
+// Config paths: primary = module dir, secondary = /data/local/tmp/fart/
+static const char* kConfigPaths[] = {
+  "/data/adb/modules/fart-los21/config/config.json",
+  "/data/local/tmp/fart/config.json",
+  nullptr
+};
+static const char* kHookLib = "/data/adb/modules/fart-los21/lib64/libfart-hook.so";
 
 static char* readFile(const char *path) {
     FILE *f = fopen(path, "r");
@@ -44,6 +49,17 @@ static bool inArray(const char *json, const char *key, const char *val) {
         p = r + 1;
     }
     return false;
+}
+
+static bool jsonEnabled(const char *json) {
+    if (!json) return false;
+    const char *p = strstr(json, "\"enable\"");
+    if (!p) return false;
+    p = strchr(p, ':');
+    if (!p) return false;
+    p++;
+    while (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n') p++;
+    return strncmp(p, "true", 4) == 0;
 }
 
 class FartLoader : public zygisk::ModuleBase {
@@ -89,11 +105,20 @@ public:
         if (pkg[0]==0) return;
         LOGI("pkg=%s", pkg);
 
-        // Hard allowlist check (only these packages)
-        static const char* allow[] = {"infosecadventures.allsafe","com.funshion.video.mobile","com.example.farttest",nullptr};
-        bool hit = false;
-        for (int i=0; allow[i]; i++) { if (strcmp(pkg, allow[i])==0) { hit=true; break; }}
-        if (!hit) { LOGI("not in hard allowlist"); return; }
+        // Try all config paths (module dir first, then /data/local/tmp/fart/)
+        char *json = nullptr;
+        for (int i = 0; kConfigPaths[i]; i++) {
+            json = readFile(kConfigPaths[i]);
+            if (json) { LOGI("config from %s", kConfigPaths[i]); break; }
+        }
+        if (!json) { LOGW("no config found (tried %d paths)", 2); return; }
+        if (!jsonEnabled(json)) { LOGI("disabled by config"); free(json); return; }
+        if (!inArray(json, "packages", pkg)) {
+            LOGI("not in config allowlist: %s", pkg);
+            free(json);
+            return;
+        }
+        free(json);
 
         // Load hook lib
         if (access(kHookLib, R_OK) != 0) { LOGE("hook not found"); return; }
