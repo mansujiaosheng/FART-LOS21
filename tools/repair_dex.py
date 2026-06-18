@@ -145,51 +145,65 @@ class DexFile:
         self.data.extend(new_data)
         return off
 
-    def update_code_off(self, method_idx, method_list_idx, new_code_off, encoded_methods):
-        """Update the code_off in the class_data_item for the given method."""
-        # Track offset in the raw data
-        # We need to find the encoded_method in rawclass_data and patch it
-
-        # Find which class_def contains this method
+    def update_code_off(self, method_idx, new_code_off):
+        """Rebuild class_data_item with updated code_off, append to DEX end."""
         for ci in range(self.class_defs_size):
             cd = self.read_class_def(ci)
             if cd['class_data_off'] == 0:
                 continue
-            class_data_start = cd['class_data_off']
-            offset = class_data_start
+            off = cd['class_data_off']
+            if off >= len(self.data):
+                continue
 
-            # Skip static/instance/direct/virtual counts
-            _, offset = read_uleb128(self.data, offset)
-            _, offset = read_uleb128(self.data, offset)
-            direct_size, offset = read_uleb128(self.data, offset)
-            virtual_size, offset = read_uleb128(self.data, offset)
+            saved_off = off
+            # Parse counts
+            static_fields_size, off = read_uleb128(self.data, off)
+            instance_fields_size, off = read_uleb128(self.data, off)
+            direct_methods_size, off = read_uleb128(self.data, off)
+            virtual_methods_size, off = read_uleb128(self.data, off)
 
-            total = direct_size + virtual_size
-            cur_idx = 0
-            prev_method_idx = 0
+            total = direct_methods_size + virtual_methods_size
+
+            # Parse all encoded_methods
+            methods = []
+            cur_midx = 0
+            found = False
             for _ in range(total):
-                diff, offset = read_uleb128(self.data, offset)
-                prev_method_idx += diff
-                _, offset = read_uleb128(self.data, offset)  # access_flags
-                code_off_start = offset
-                code_off_val, offset = read_uleb128(self.data, offset)
+                diff, off = read_uleb128(self.data, off)
+                cur_midx += diff
+                access_flags, off = read_uleb128(self.data, off)
+                code_val, off = read_uleb128(self.data, off)
+                methods.append([cur_midx, access_flags, code_val])
+                if cur_midx == method_idx and code_val == 0:
+                    methods[-1][2] = new_code_off
+                    found = True
 
-                if prev_method_idx == method_idx and code_off_val == 0:
-                    # Patch the code_off ULEB128 at this position
-                    # Replace the ULEB128 with new value
-                    # Calculate bytes needed
-                    old_size = offset - code_off_start
-                    new_uleb = self._encode_uleb128(new_code_off)
-                    if len(new_uleb) == old_size:
-                        # Same size, overwrite in place
-                        self.data[code_off_start:offset] = new_uleb
-                        return True
-                    else:
-                        # Size changed - shift data
-                        # For simplicity, just return False and let the caller
-                        # rebuild from scratch
-                        # (ULEB128 for code_off < 2^21 uses 3 bytes max, usually same size)
-                        return False
+            if not found:
+                continue
+
+            # Re-encode the entire class_data_item
+            new_data = bytearray()
+            new_data.extend(self._encode_uleb128(static_fields_size))
+            new_data.extend(self._encode_uleb128(instance_fields_size))
+            new_data.extend(self._encode_uleb128(direct_methods_size))
+            new_data.extend(self._encode_uleb128(virtual_methods_size))
+            prev_midx = 0
+            for m in methods:
+                diff = m[0] - prev_midx
+                new_data.extend(self._encode_uleb128(diff))
+                new_data.extend(self._encode_uleb128(m[1]))  # access_flags
+                new_data.extend(self._encode_uleb128(m[2]))  # code_off
+                prev_midx = m[0]
+
+            # Append to DEX end
+            new_off = self.append_data(bytes(new_data))
+
+            # Update class_def's class_data_off
+            class_def_off = self.class_defs_off + ci * 32 + 24
+            struct.pack_into('<I', self.data, class_def_off, new_off)
+
+            return True
+
         return False
 
     @staticmethod
@@ -333,7 +347,7 @@ def repair(dex_path, code_dir, out_path):
         new_off = dex.append_data(code_data)
 
         # Update code_off in encoded_method
-        success = dex.update_code_off(midx, 0, new_off, encoded_methods)
+        success = dex.update_code_off(midx, new_off)
         if success:
             repaired_count += 1
             print(f"  [+] Method {midx}: code_off -> 0x{new_off:x}")
