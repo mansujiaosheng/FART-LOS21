@@ -4,8 +4,8 @@ SD="$(cd "$(dirname "$0")" && pwd)"
 BD="$SD/build"
 ANDROID_HOME="/home/mansu/Android/Sdk"
 AAPT2="$ANDROID_HOME/build-tools/34.0.0/aapt2"
+D8="$ANDROID_HOME/build-tools/34.0.0/d8"
 AJ="$ANDROID_HOME/platforms/android-34/android.jar"
-DX="/lina_android/lineage/prebuilts/build-tools/common/bin/dx"
 PKG="com.fartlos21.controller"
 
 echo "=== FART\u63a7\u5236\u5668 Build ==="
@@ -29,10 +29,13 @@ echo "  javac..."
 javac -source 8 -target 8 -cp "$AJ" -d "$BD/classes" \
   "$SD/app/src/main/java/com/fartlos21/controller/"*.java 2>&1 | grep -v warning
 
-# DEX
-echo "  dx..."
-cd "$BD/classes" && "$DX" --dex --min-sdk-version 34 --output="$BD/classes.dex" \
-  com/fartlos21/controller/*.class 2>&1
+# DEX with d8 (handles lambdas properly)
+echo "  d8..."
+mkdir -p "$BD/dex-out"
+"$D8" --min-api 34 --output "$BD/dex-out" \
+  "$BD/classes/com/fartlos21/controller/"*.class 2>&1
+cp "$BD/dex-out/classes.dex" "$BD/classes.dex"
+rm -rf "$BD/dex-out"
 
 # Package APK
 echo "  apk..."
