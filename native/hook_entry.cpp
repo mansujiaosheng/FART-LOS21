@@ -270,8 +270,8 @@ void ArtMethodInvokeHook(void* art_method, void* thread, uint32_t* args,
                 citask.outs_size = outs;
                 citask.tries_size = tries;
                 citask.insns_size = insns;
-                citask.dump_size = 16 + (size_t)insns * 2;
-                citask.dump_complete = (tries == 0);
+                citask.dump_size = CodeItemDumper::CalculateCodeItemSize(ci, tries, insns);
+                citask.dump_complete = true;
                 snprintf(citask.source, sizeof(citask.source), "%s",
                          g_active_invoke_running ? "active_invoke" : "ArtMethodInvoke");
 

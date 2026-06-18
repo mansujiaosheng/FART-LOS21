@@ -131,6 +131,7 @@ class CodeItemDumper {
   // Validate code_item fields
   static bool IsValidCodeItem(const CodeItemDumpTask& task);
 
+ public:
   // Calculate complete code_item size including try/catch handlers
   static size_t CalculateCodeItemSize(const uint8_t* code_item, uint16_t tries_size, uint32_t insns_size);
 
