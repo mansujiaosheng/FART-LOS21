@@ -64,16 +64,26 @@ def analyze(dex_path, csv_path, code_dir, out_path):
         str_off = struct.unpack_from('<I', dex.data, string_ids_off + str_idx * 4)[0]
         if str_off >= len(dex.data):
             return f"<str_{str_idx}_oob>"
-        end = dex.data.find(b'\0', str_off)
+        # String data starts after ULEB128 length prefix
+        s = str_off
+        while s < len(dex.data) and dex.data[s] & 0x80:
+            s += 1
+        s += 1  # skip the last byte of ULEB128
+        end = dex.data.find(b'\0', s)
         if end < 0:
             return f"<str_{str_idx}_nul>"
-        return dex.data[str_off:end].decode('utf-8', errors='replace')
+        return dex.data[s:end].decode('utf-8', errors='replace')
 
     def read_type_str(type_idx):
         if type_idx >= type_ids_size:
             return f"<type_{type_idx}>"
         str_idx = struct.unpack_from('<I', dex.data, type_ids_off + type_idx * 4)[0]
-        return read_string(str_idx)
+        raw = read_string(str_idx)
+        # Strip DEX internal format: "Ljava/lang/String;" -> "java.lang.String"
+        if raw.startswith('L') and raw.endswith(';'):
+            raw = raw[1:-1]
+        raw = raw.replace('/', '.')
+        return raw
 
     def get_method_name(method_idx):
         if method_idx >= dex.method_ids_size:
@@ -94,6 +104,17 @@ def analyze(dex_path, csv_path, code_dir, out_path):
     missing_by_class = defaultdict(int)
     missing_by_package = defaultdict(int)
     missing_by_dex_key = defaultdict(int)
+    sanity_errors = 0
+
+    # For sanity: check if the first few class_defs' declaring class matches
+    # the class_def's own class_idx (ULEB128 diff calculation check)
+    # We'll verify by checking the class_def's class_idx
+    def get_class_def_class_name(class_def_idx):
+        if class_def_idx >= dex.class_defs_size:
+            return "<oob>"
+        off = dex.class_defs_off + class_def_idx * 32
+        cls_idx = struct.unpack_from('<I', dex.data, off)[0]
+        return read_type_str(cls_idx)
 
     # Access flags
     kAccAbstract = 0x0400
@@ -117,6 +138,14 @@ def analyze(dex_path, csv_path, code_dir, out_path):
     print(f"    Total encoded methods: {total}")
     print(f"    Abstract/native:       {abstract_native}")
     print(f"    With code_off:         {with_code}")
+    print(f"    Missing code:          {missing}")
+
+    # Sanity check: if >10% missing methods are android.*, flag it
+    android_missing = sum(1 for cls, cnt in missing_by_class.items() if cls.startswith('android.'))
+    if missing > 0 and android_missing / missing > 0.1:
+        print(f"    [!] WARNING: {android_missing}/{missing} missing methods are android.*")
+        print(f"        This suggests a parsing issue — android framework methods")
+        print(f"        should not normally appear in a target APK's class_defs.")
     print(f"    Missing code:          {missing}")
 
     # Match records to DEX
