@@ -8,7 +8,7 @@ PKG = 'com.fartlos21.controller'
 strings = [
     '', 'http://schemas.android.com/apk/res/android',
     'manifest', 'package', PKG,
-    'uses-sdk', 'minSdkVersion',
+    'uses-sdk', 'minSdkVersion', 'targetSdkVersion',
     'application', 'label', 'FART\u63a7\u5236\u5668',
     'activity', 'name', '.MainActivity', 'exported',
     'intent-filter', 'action', 'android.intent.action.MAIN',
@@ -19,7 +19,9 @@ def build_sp(strs):
     offs, buf = [], b''
     for s in strs:
         offs.append(len(buf))
-        buf += s.encode('utf-16-le') + b'\x00\x00'
+        encoded = s.encode('utf-16-le')
+        char_cnt = len(encoded) // 2
+        buf += struct.pack('<H', char_cnt) + encoded
     while len(buf) % 4: buf += b'\x00\x00'
     n = len(strs); h = 28; sz = h + n * 4 + len(buf)
     c = struct.pack('<HHI', 0x0001, h, sz)
@@ -52,7 +54,7 @@ data = bytearray()
 data += build_sp(strings)
 data += nstag(1, True)
 data += stag(2, [(0xFFFFFFFF, 3, 4, 3, 4)])  # manifest
-data += stag(5, [(1, 6, 7, 3, 7)])  # uses-sdk
+data += stag(5, [(1, 6, 0xFFFFFFFF, 0x10, 34), (1, 7, 0xFFFFFFFF, 0x10, 34)])  # uses-sdk
 data += etag(5)
 data += stag(7, [(1, 8, 9, 3, 9)])  # application
 data += stag(10, [(1, 11, 12, 3, 12), (1, 13, 0xFFFFFFFF, 0x12, 0xFFFFFFFF)])  # activity

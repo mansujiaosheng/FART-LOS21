@@ -4,6 +4,8 @@
 
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
 
+    <uses-sdk android:minSdkVersion="34" android:targetSdkVersion="34" />
+
     <application
         android:label="FART\u63a7\u5236\u5668">
         <activity

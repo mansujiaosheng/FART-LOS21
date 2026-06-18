@@ -2,17 +2,27 @@
 set -e
 SD="$(cd "$(dirname "$0")" && pwd)"
 BD="$SD/build"
-AJ="/lina_android/lineage/packages/apps/Seedvault/libs/aosp/android.jar"
+ANDROID_HOME="/home/mansu/Android/Sdk"
+AAPT2="$ANDROID_HOME/build-tools/34.0.0/aapt2"
+AJ="$ANDROID_HOME/platforms/android-34/android.jar"
 DX="/lina_android/lineage/prebuilts/build-tools/common/bin/dx"
 PKG="com.fartlos21.controller"
 
 echo "=== FART\u63a7\u5236\u5668 Build ==="
 rm -rf "$BD"
-mkdir -p "$BD/classes"
+mkdir -p "$BD/classes" "$BD/res"
 
-# Generate binary AndroidManifest.xml via build_simple.py
-echo "  binary AXML..."
-python3 "$SD/build_simple.py" "$BD"
+# Compile resources + manifest -> binary AXML
+echo "  aapt2 compile..."
+"$AAPT2" compile -o "$BD/res/strings.arsc" \
+  "$SD/app/src/main/res/values/strings.xml" 2>&1
+echo "  aapt2 link..."
+"$AAPT2" link -o "$BD/linked.apk" \
+  --manifest "$SD/app/src/main/AndroidManifest.xml" \
+  -I "$AJ" \
+  --auto-add-overlay 2>&1
+# Extract binary AndroidManifest.xml
+cd "$BD" && unzip -q linked.apk AndroidManifest.xml && cd "$SD"
 
 # Compile Java
 echo "  javac..."
