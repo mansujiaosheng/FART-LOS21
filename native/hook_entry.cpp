@@ -565,6 +565,25 @@ void fart_on_app_specialize(JNIEnv* env, const char* package_name, const char* m
 
   if (!g_config.enable) { LOGI("disabled by config"); return; }
 
+  // Phase 1A: Check if dump_dir is writable; fallback to app's data dir
+  if (access(g_config.dump_dir.c_str(), W_OK) != 0) {
+    // Construct path using package name: /data/data/<pkg>/files/fart_dump/
+    char new_dump_dir[512];
+    snprintf(new_dump_dir, sizeof(new_dump_dir), "/data/data/%s/files/fart_dump", package_name);
+    mkdir(new_dump_dir, 0777);
+    chmod(new_dump_dir, 0777);
+    g_config.dump_dir = std::string(new_dump_dir);
+    LOGI("dump_dir fallback to app data dir: %s", new_dump_dir);
+
+    // Also create methods subdirectory (for codeitem dump)
+    char methods_dir[512];
+    snprintf(methods_dir, sizeof(methods_dir), "%s/methods", new_dump_dir);
+    mkdir(methods_dir, 0777);
+    chmod(methods_dir, 0777);
+  } else {
+    LOGI("dump_dir is writable: %s", g_config.dump_dir.c_str());
+  }
+
   // Setup hooks
   if (SetupHooks()) {
     // Snapshot: dump already-loaded dex files

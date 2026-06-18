@@ -376,13 +376,27 @@ bool CodeItemDumper::EnsureMethodsDir() {
   if (dump_dir_.empty()) return false;
   struct stat st;
 
-  // Create dump_dir/methods/ if needed
+  // Ensure dump_dir_ exists with 777
+  if (stat(dump_dir_.c_str(), &st) != 0) {
+    if (mkdir(dump_dir_.c_str(), 0777) != 0 && errno != EEXIST) {
+      LOGE("codeitem_dump: cannot create %s: %d", dump_dir_.c_str(), errno);
+      return false;
+    }
+  } else {
+    // Fix permissions on existing dir
+    chmod(dump_dir_.c_str(), 0777);
+  }
+
+  // Create/verify dump_dir/methods/ with 777
   std::string dir = dump_dir_ + "/methods";
   if (stat(dir.c_str(), &st) != 0) {
     if (mkdir(dir.c_str(), 0777) != 0 && errno != EEXIST) {
       LOGE("codeitem_dump: cannot create %s: %d", dir.c_str(), errno);
       return false;
     }
+  } else {
+    // Fix permissions on existing methods dir
+    chmod(dir.c_str(), 0777);
   }
   return true;
 }

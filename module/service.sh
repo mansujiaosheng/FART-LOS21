@@ -10,6 +10,7 @@ FART_DIR="/data/local/tmp/fart"
 mkdir -p "$FART_DIR" "$CTRL_DIR" /data/local/tmp/fart_dump /data/local/tmp/fart_dump/methods
 cp "$MODPATH/lib64/libfart-hook.so" "$FART_DIR/libfart-hook.so" 2>/dev/null
 chmod 755 "$FART_DIR/libfart-hook.so" 2>/dev/null
+chcon u:object_r:system_lib_file:s0 "$FART_DIR/libfart-hook.so" 2>/dev/null
 
 # Wait for system to settle
 sleep 15
@@ -23,6 +24,7 @@ while true; do
     chmod 777 "$CTRL_DIR/.module_heartbeat"
     cp "$MODPATH/lib64/libfart-hook.so" "$FART_DIR/libfart-hook.so" 2>/dev/null
     chmod 755 "$FART_DIR/libfart-hook.so" 2>/dev/null
+    chcon u:object_r:system_lib_file:s0 "$FART_DIR/libfart-hook.so" 2>/dev/null
 
     # Write stats for the app
     dex_count=$(ls /data/local/tmp/fart_dump/*.dex 2>/dev/null | wc -l)
