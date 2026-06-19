@@ -7,6 +7,7 @@
 #include "arm64_hook.h"
 #include "codeitem_dump.h"
 #include "active_invoke.h"
+#include <setjmp.h>
 
 #include <cstdio>
 #include <cstring>
@@ -17,6 +18,7 @@
 #include <sys/syscall.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <errno.h>
 #include <android/log.h>
 #include <jni.h>
 
@@ -60,9 +62,16 @@ static void* g_load_method_orig = nullptr;
 // Crash handlers
 static struct sigaction old_sigsegv;
 static struct sigaction old_sigbus;
+static sigjmp_buf g_crash_jmp;
+static volatile bool g_in_hook_critical = false;
 
 static void CrashHandler(int sig, siginfo_t* info, void* context) {
-  LOGE("CRASH: signal=%d, addr=%p, disabling hooks", sig, info->si_addr);
+  LOGE("CRASH: signal=%d, addr=%p, in_hook=%d", sig, info->si_addr, g_in_hook_critical);
+  if (g_in_hook_critical) {
+    // Jump back to the hook's safe point instead of killing the process
+    g_hooks_active = false;
+    siglongjmp(g_crash_jmp, 1);
+  }
   if (g_define_hook) { g_define_hook->Unhook(); delete g_define_hook; g_define_hook = nullptr; }
   if (g_artmethod_hook) { g_artmethod_hook->Unhook(); delete g_artmethod_hook; g_artmethod_hook = nullptr; }
   g_hooks_active = false;
@@ -102,6 +111,102 @@ static bool IsRangeReadable(const void* addr, size_t size) {
   return ok;
 }
 
+// ===== Async DEX dump queue =====
+#include <pthread.h>
+struct DexDumpEntry {
+  uint8_t* data;
+  uint32_t size;
+  char filename[512];
+};
+static constexpr int kMaxDexQueue = 64;
+static DexDumpEntry g_dex_queue[kMaxDexQueue];
+static int g_dex_queue_head = 0;
+static int g_dex_queue_tail = 0;
+static pthread_mutex_t g_dex_queue_mutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t g_dex_queue_cond = PTHREAD_COND_INITIALIZER;
+static pthread_t g_dex_dump_thread;
+static volatile bool g_dex_dump_thread_running = false;
+
+static void* DexDumpThreadFunc(void*) {
+  LOGI("DexDumpThread started");
+  while (g_dex_dump_thread_running) {
+    pthread_mutex_lock(&g_dex_queue_mutex);
+    while (g_dex_queue_head == g_dex_queue_tail && g_dex_dump_thread_running) {
+      pthread_cond_wait(&g_dex_queue_cond, &g_dex_queue_mutex);
+    }
+    if (!g_dex_dump_thread_running && g_dex_queue_head == g_dex_queue_tail) {
+      pthread_mutex_unlock(&g_dex_queue_mutex);
+      break;
+    }
+    DexDumpEntry entry = g_dex_queue[g_dex_queue_head % kMaxDexQueue];
+    g_dex_queue_head++;
+    pthread_mutex_unlock(&g_dex_queue_mutex);
+
+    // Write DEX file in background
+    int fd = open(entry.filename, O_CREAT | O_WRONLY | O_TRUNC, 0644);
+    if (fd >= 0) {
+      size_t written = write(fd, entry.data, entry.size);
+      close(fd);
+      if (written > 0) {
+        LOGI("Dumped dex: %s (%zu bytes of %u)", entry.filename, written, entry.size);
+      } else {
+        LOGE("write failed for %s", entry.filename);
+        unlink(entry.filename);
+      }
+    }
+    free(entry.data);
+  }
+  LOGI("DexDumpThread exiting");
+  return nullptr;
+}
+
+static void StartDexDumpThread() {
+  if (g_dex_dump_thread_running) return;
+  g_dex_dump_thread_running = true;
+  pthread_create(&g_dex_dump_thread, nullptr, DexDumpThreadFunc, nullptr);
+}
+
+static void EnqueueDexDump(const uint8_t* begin, uint32_t size, const char* filename) {
+  // Deep copy the DEX data (fast memcpy, ~10ms for 26MB)
+  uint8_t* copy = (uint8_t*)malloc(size);
+  if (!copy) { LOGE("malloc failed for dex dump"); return; }
+
+  // Copy with EFAULT page skipping
+  size_t copied = 0;
+  const uint8_t* ptr = begin;
+  while (copied < size) {
+    size_t chunk = size - copied;
+    if (chunk > 65536) chunk = 65536;
+    if (IsRangeReadable(ptr, chunk)) {
+      memcpy(copy + copied, ptr, chunk);
+      copied += chunk;
+      ptr += chunk;
+    } else {
+      // Skip unreadable page, fill with zeros
+      size_t skip = 4096;
+      if (skip > (size - copied)) skip = size - copied;
+      memset(copy + copied, 0, skip);
+      copied += skip;
+      ptr += skip;
+    }
+  }
+
+  pthread_mutex_lock(&g_dex_queue_mutex);
+  int next_tail = g_dex_queue_tail + 1;
+  if ((next_tail - g_dex_queue_head) >= kMaxDexQueue) {
+    // Queue full, drop oldest
+    free(g_dex_queue[g_dex_queue_head % kMaxDexQueue].data);
+    g_dex_queue_head++;
+  }
+  DexDumpEntry& entry = g_dex_queue[g_dex_queue_tail % kMaxDexQueue];
+  entry.data = copy;
+  entry.size = (uint32_t)copied;
+  snprintf(entry.filename, sizeof(entry.filename), "%s", filename);
+  g_dex_queue_tail = next_tail;
+  pthread_cond_signal(&g_dex_queue_cond);
+  pthread_mutex_unlock(&g_dex_queue_mutex);
+}
+
 // ===== DefineClass Hook =====
 extern "C" __attribute__((used))
 void* DefineClassHook(void* class_linker, void* thread, const char* descriptor,
@@ -121,21 +226,36 @@ void* DefineClassHook(void* class_linker, void* thread, const char* descriptor,
 
   if (!g_hooks_active.load() || !g_config.dump_dex || !dex_file_ptr) return result;
 
+  // Protect against invalid DexFile pointers (e.g., from packer's custom class loader)
+  if (sigsetjmp(g_crash_jmp, 1) != 0) {
+    LOGW("DefineClassHook: recovered from crash, skipping dex dump for %s",
+         descriptor ? descriptor : "?");
+    return result;
+  }
+  g_in_hook_critical = true;
+
   // Mask pointer tags (Android 14 uses TBI/tagged pointers)
   uintptr_t dex_obj = (uintptr_t)dex_file_ptr & 0x00FFFFFFFFFFFFFF;
 
+  // Validate DexFile pointer: must be readable and have a plausible begin_ pointer
+  if (!IsRangeReadable((const void*)dex_obj, 0xD0)) {
+    LOGW("DefineClassHook: dex_file %p not readable, skipping", dex_file_ptr);
+    g_in_hook_critical = false;
+    return result;
+  }
+
   // Read begin_ from DexFile+8 (after vtable)
   const uint8_t* begin = *(const uint8_t**)(dex_obj + 8);
-  if (!begin) { LOGW("begin_ is null"); return result; }
-  if (!IsRangeReadable(begin, 32)) { LOGW("begin not readable"); return result; }
+  if (!begin) { LOGW("begin_ is null"); g_in_hook_critical = false; return result; }
+  if (!IsRangeReadable(begin, 32)) { LOGW("begin not readable"); g_in_hook_critical = false; return result; }
 
   // Verify dex magic
   static const uint8_t kDexMagic[] = {0x64, 0x65, 0x78, 0x0a};
-  if (memcmp(begin, kDexMagic, 4) != 0) { LOGW("bad dex magic"); return result; }
+  if (memcmp(begin, kDexMagic, 4) != 0) { LOGW("bad dex magic"); g_in_hook_critical = false; return result; }
 
   // Read file_size from header (offset 0x20)
   uint32_t dex_size = *(const uint32_t*)(begin + 0x20);
-  if (dex_size < 64 || dex_size > 0x20000000) { LOGW("invalid size: %u", dex_size); return result; }
+  if (dex_size < 64 || dex_size > 0x20000000) { LOGW("invalid size: %u", dex_size); g_in_hook_critical = false; return result; }
 
   // Try to recover the full DEX from the DexFileContainer
   // container_ is a shared_ptr<DexFileContainer> at DexFile+0xB0
@@ -187,49 +307,17 @@ void* DefineClassHook(void* class_linker, void* thread, const char* descriptor,
 
   LOGI("Dex size used: %u bytes", dex_size);
 
-  // Deep copy and write synchronously (to /data/local/tmp/ for SELinux compatibility)
+  // Async dump: memcpy in hook (fast), file write in background thread
   pid_t pid = getpid();
   char filename[512];
   snprintf(filename, sizeof(filename), "%s/dex_%d_%d.dex",
            g_config.dump_dir.c_str(),
            pid, (int)syscall(__NR_gettid));
 
-  // Read into stack/local buffer first (validate), then write
-  int fd = open(filename, O_CREAT | O_WRONLY | O_TRUNC, 0644);
-  if (fd < 0) { LOGE("cannot open %s", filename); return result; }
+  StartDexDumpThread();
+  EnqueueDexDump(begin, dex_size, filename);
 
-  // Write in chunks, skip unreadable pages
-  const uint8_t* ptr = begin;
-  size_t remaining = dex_size;
-  size_t total_written = 0;
-  bool had_error = false;
-  while (remaining > 0 && !had_error) {
-    size_t chunk = (remaining > 65536) ? 65536 : remaining;
-    ssize_t w = write(fd, ptr, chunk);
-    if (w > 0) {
-      remaining -= (size_t)w;
-      ptr += w;
-      total_written += (size_t)w;
-    } else if (w == 0) {
-      break;
-    } else {
-      // EFAULT: page not readable, skip 1 page and retry
-      size_t skip = 4096;
-      if (skip > remaining) skip = remaining;
-      remaining -= skip;
-      ptr += skip;
-      had_error = true;
-      LOGW("write EFAULT at offset %zu, skipping page", total_written);
-    }
-  }
-  close(fd);
-  if (total_written > 0) {
-    LOGI("Dumped dex: %s (%zu bytes of %u)", filename, total_written, dex_size);
-  } else {
-    LOGE("write failed for %s", filename);
-    unlink(filename);
-  }
-
+  g_in_hook_critical = false;
   return result;
 }
 
@@ -284,38 +372,54 @@ void ArtMethodInvokeHook(void* art_method, void* thread, uint32_t* args,
                class_ref, dex_idx, access_flags);
 
           // Stage 2.3: Read CodeItem metadata from ptr_sized_fields_.data_ (offset 0x10)
-          // At runtime, data_ is a direct CodeItem* pointer (bit 0 may be a flag)
+          // At runtime, data_ is a direct CodeItem* pointer (bit 0 = compact_dex flag)
           uintptr_t data_ptr = *(const uintptr_t*)(m + 0x10);
+          bool is_compact_dex = (data_ptr & 1) != 0;
           const uint8_t* ci = (const uint8_t*)(data_ptr & ~1ULL);
-          if (ci != nullptr && IsRangeReadable(ci, 16)) {
-            uint16_t regs  = *(const uint16_t*)(ci + 0);
-            uint16_t ins   = *(const uint16_t*)(ci + 2);
-            uint16_t outs  = *(const uint16_t*)(ci + 4);
-            uint16_t tries = *(const uint16_t*)(ci + 6);
-            // Skip debug_info_off at +8 (4 bytes)
-            uint32_t insns = *(const uint32_t*)(ci + 12);
+          if (ci != nullptr && IsRangeReadable(ci, is_compact_dex ? 4 : 16)) {
+            uint16_t regs, ins, outs, tries;
+            uint32_t insns;
+
+            if (is_compact_dex) {
+              if (!CodeItemDumper::DecodeCompactCodeItem(ci, regs, ins, outs, tries, insns)) {
+                LOGI("CodeItem: compact decode failed (data_ptr=0x%zx)", data_ptr);
+                goto call_original;
+              }
+            } else {
+              regs  = *(const uint16_t*)(ci + 0);
+              ins   = *(const uint16_t*)(ci + 2);
+              outs  = *(const uint16_t*)(ci + 4);
+              tries = *(const uint16_t*)(ci + 6);
+              insns = *(const uint32_t*)(ci + 12);
+            }
+
             if (insns > 0 && insns < 65536) {
-              LOGI("CodeItem: regs=%u ins=%u outs=%u tries=%u insns=%u ptr=%p",
-                   regs, ins, outs, tries, insns, ci);
+              LOGI("CodeItem: regs=%u ins=%u outs=%u tries=%u insns=%u ptr=%p%s",
+                   regs, ins, outs, tries, insns, ci,
+                   is_compact_dex ? " [compact]" : "");
 
               // Stage 2.4: Passive CodeItem dump (header + insns only)
               if (g_config.enable_codeitem_dump && g_codeitem_dumper != nullptr) {
                 CodeItemDumpTask citask;
-                citask.pid = getpid();
-                citask.tid = (pid_t)syscall(__NR_gettid);
-                citask.method_idx = dex_idx;
-                citask.registers_size = regs;
-                citask.ins_size = ins;
-                citask.outs_size = outs;
-                citask.tries_size = tries;
-                citask.insns_size = insns;
-                citask.dump_size = CodeItemDumper::CalculateCodeItemSize(ci, tries, insns);
-                citask.dump_complete = true;
-                snprintf(citask.source, sizeof(citask.source), "%s",
-                         g_active_invoke_running ? "active_invoke" : "ArtMethodInvoke");
-                // Compute dex_key from code_item base (approximate DEX identity)
-                uintptr_t ci_page = (uintptr_t)ci & ~0xFFFULL;
-                snprintf(citask.dex_key, sizeof(citask.dex_key), "%lx", ci_page);
+  citask.pid = getpid();
+  citask.tid = (pid_t)syscall(__NR_gettid);
+  citask.method_idx = dex_idx;
+  citask.registers_size = regs;
+  citask.ins_size = ins;
+  citask.outs_size = outs;
+  citask.tries_size = tries;
+  citask.insns_size = insns;
+  citask.dump_size = is_compact_dex
+      ? CodeItemDumper::CalculateCompactCodeItemSize(ci, tries, insns)
+      : CodeItemDumper::CalculateCodeItemSize(ci, tries, insns);
+  citask.dump_complete = true;
+  snprintf(citask.source, sizeof(citask.source), "%s",
+           g_active_invoke_running ? "active_invoke" : "ArtMethodInvoke");
+  // Compute dex_key from code_item base (approximate DEX identity)
+  uintptr_t ci_page = (uintptr_t)ci & ~0xFFFULL;
+  snprintf(citask.dex_key, sizeof(citask.dex_key), "%lx", ci_page);
+  // Process name for session isolation
+  snprintf(citask.process_name, sizeof(citask.process_name), "%s", g_package);
 
                 // Sync memcpy to owned buffer (safe copy)
                 if (citask.CopyData(ci, citask.dump_size)) {
@@ -353,6 +457,179 @@ call_original:
     orig(art_method, thread, args, args_size, result, shorty);
   }
   g_fart_in_invoke = false;
+}
+
+// ===== Safe memory read via /proc/self/mem (avoids SIGBUS/SIGSEGV) =====
+// Returns bytes actually read, or 0 on error.
+static size_t SafeMemRead(uintptr_t addr, void* buf, size_t size) {
+  int fd = open("/proc/self/mem", O_RDONLY);
+  if (fd < 0) return 0;
+  ssize_t n = pread(fd, buf, size, (off_t)addr);
+  close(fd);
+  return (n > 0) ? (size_t)n : 0;
+}
+
+// ===== Sync DEX write (for nohook mode, must complete before dlclose) =====
+static void WriteDexSync(const uint8_t* begin, uint32_t size, const char* filename) {
+  // Use SafeMemRead via /proc/self/mem to avoid SIGBUS/SIGSEGV
+  uint8_t* copy = (uint8_t*)malloc(size);
+  if (!copy) { LOGE("malloc failed for sync dex dump"); return; }
+
+  size_t copied = SafeMemRead((uintptr_t)begin, copy, size);
+  if (copied == 0) {
+    // Fallback to direct memcpy with page skipping
+    copied = 0;
+    const uint8_t* ptr = begin;
+    while (copied < size) {
+      size_t chunk = size - copied;
+      if (chunk > 65536) chunk = 65536;
+      if (IsRangeReadable(ptr, chunk)) {
+        memcpy(copy + copied, ptr, chunk);
+        copied += chunk;
+        ptr += chunk;
+      } else {
+        size_t skip = 4096;
+        if (skip > (size - copied)) skip = size - copied;
+        memset(copy + copied, 0, skip);
+        copied += skip;
+        ptr += skip;
+      }
+    }
+  }
+
+  int fd = open(filename, O_CREAT | O_WRONLY | O_TRUNC, 0644);
+  if (fd >= 0) {
+    size_t written = write(fd, copy, copied);
+    close(fd);
+    if (written > 0) {
+      LOGI("SyncDumped dex: %s (%zu bytes of %u)", filename, written, size);
+    } else {
+      LOGE("write failed for %s", filename);
+      unlink(filename);
+    }
+  } else {
+    LOGE("cannot create %s: %s", filename, strerror(errno));
+  }
+  free(copy);
+}
+
+// ===== Dump DEX by scanning /proc/self/maps (no native hooks needed) =====
+// This is the "stealth" mode: no inline hooks, just scan memory for DEX regions.
+// Works with packers that detect inline hooks (e.g., 邦邦加固/KADP).
+// When sync=true, writes files directly (for nohook+dlclose strategy).
+static void DumpDexFromMaps(bool sync = false) {
+  LOGI("DumpDexFromMaps: scanning /proc/self/maps for DEX regions...");
+
+  FILE* fp = fopen("/proc/self/maps", "r");
+  if (!fp) { LOGE("DumpDexFromMaps: cannot open /proc/self/maps"); return; }
+
+  // Debug: log any "fart" or "zygisk" entries in maps (to understand packer detection)
+  {
+    FILE* dfp = fopen("/proc/self/maps", "r");
+    if (dfp) {
+      char dline[512];
+      while (fgets(dline, sizeof(dline), dfp)) {
+        if (strstr(dline, "fart") || strstr(dline, "zygisk") || strstr(dline, "magisk")) {
+          LOGI("maps_debug: %s", dline);
+          // Remove trailing newline
+          char* nl = strchr(dline, '\n');
+          if (nl) *nl = 0;
+        }
+      }
+      fclose(dfp);
+    }
+  }
+
+  char line[512];
+  int dex_count = 0;
+  while (fgets(line, sizeof(line), fp)) {
+    uintptr_t start, end;
+    char perms[8] = {};
+    uintptr_t offset;
+    char dev[16] = {};
+    uintptr_t inode;
+    char pathname[256] = {};
+
+    // Parse: start-end perms offset dev inode pathname
+    int n = sscanf(line, "%lx-%lx %7s %lx %15s %lu %255[^\n]",
+                   &start, &end, perms, &offset, dev, &inode, pathname);
+    if (n < 7) {
+      // Try without pathname
+      n = sscanf(line, "%lx-%lx %7s %lx %15s %lu",
+                     &start, &end, perms, &offset, dev, &inode);
+      if (n < 6) continue;
+      pathname[0] = '\0';
+    }
+
+    // Skip non-readable regions
+    if (perms[0] != 'r') continue;
+
+    // Skip very small regions (< 64 bytes can't be a valid DEX)
+    size_t region_size = end - start;
+    if (region_size < 64) continue;
+
+    // Skip obvious non-DEX regions (stack, vsyscall, vvar, etc.)
+    if (strstr(pathname, "[stack") || strstr(pathname, "[vsyscall") ||
+        strstr(pathname, "[vvar") || strstr(pathname, "[vdso") ||
+        strstr(pathname, "/dev/") || strstr(pathname, "/system/fonts/")) {
+      continue;
+    }
+
+    // Check for DEX magic at the start of the region
+    // DEX magic: 64 65 78 0a ("dex\n")
+    // Use SafeMemRead to avoid SIGBUS/SIGSEGV from packer modifying pages
+    uint8_t header[64];
+    size_t hdr_read = SafeMemRead(start, header, 64);
+    if (hdr_read < 4) continue;
+
+    static const uint8_t kDexMagic[] = {0x64, 0x65, 0x78, 0x0a};
+    if (memcmp(header, kDexMagic, 4) != 0) continue;
+
+    // Found DEX magic! Read the size from header (offset 0x20)
+    uint32_t dex_size = 0;
+    if (hdr_read >= 0x24) {
+      memcpy(&dex_size, header + 0x20, 4);
+    } else {
+      // Read just the size field
+      SafeMemRead(start + 0x20, &dex_size, 4);
+    }
+    if (dex_size < 64 || dex_size > 0x10000000) {  // max 256MB
+      LOGW("DumpDexFromMaps: DEX at 0x%lx has invalid size %u, skipping", (unsigned long)start, dex_size);
+      continue;
+    }
+
+    // Check if the full DEX fits within the mapped region
+    // Some DEX files span multiple mappings; try to read up to dex_size
+    size_t available = region_size;
+    if (dex_size > available) {
+      LOGW("DumpDexFromMaps: DEX at 0x%lx size=%u > region=%zu, truncating",
+           (unsigned long)start, dex_size, available);
+      dex_size = (uint32_t)available;
+    }
+
+    // Skip IsRangeReadable check - SafeMemRead in WriteDexSync handles errors
+
+    dex_count++;
+    LOGI("DumpDexFromMaps: found DEX #%d at 0x%lx size=%u region=%zu pathname=%s",
+         dex_count, (unsigned long)start, dex_size, region_size, pathname);
+
+    // Dump: sync or async
+    pid_t pid = getpid();
+    char filename[512];
+    snprintf(filename, sizeof(filename), "%s/dex_maps_%d_%d.dex",
+             g_config.dump_dir.c_str(), pid, dex_count);
+
+    const uint8_t* dex_ptr = (const uint8_t*)start;
+    if (sync) {
+      WriteDexSync(dex_ptr, dex_size, filename);
+    } else {
+      StartDexDumpThread();
+      EnqueueDexDump(dex_ptr, dex_size, filename);
+    }
+  }
+
+  fclose(fp);
+  LOGI("DumpDexFromMaps: found %d DEX regions", dex_count);
 }
 
 // ===== Post-hook snapshot dump via Java reflection =====
@@ -530,15 +807,28 @@ void LoadMethodHook(void* class_linker, void* dex_file_ptr, void* class_method_p
 
   // Read code_item pointer from ptr_sized_fields_.data_ (offset 0x10)
   uintptr_t data_ptr = *(const uintptr_t*)(m + 0x10);
+  // Bit 0 of data_ is the compact_dex_code_item flag (from SetCodeItem)
+  bool is_compact_dex = (data_ptr & 1) != 0;
   const uint8_t* ci = (const uint8_t*)(data_ptr & ~1ULL);
   if (ci == nullptr) return;
 
-  // Read code_item header
-  uint16_t regs  = *(const uint16_t*)(ci + 0);
-  uint16_t ins   = *(const uint16_t*)(ci + 2);
-  uint16_t outs  = *(const uint16_t*)(ci + 4);
-  uint16_t tries = *(const uint16_t*)(ci + 6);
-  uint32_t insns = *(const uint32_t*)(ci + 12);
+  uint16_t regs, ins, outs, tries;
+  uint32_t insns;
+
+  if (is_compact_dex) {
+    // CompactDex CodeItem: 4-byte header with packed bit fields
+    if (!IsRangeReadable(ci, 4)) return;
+    if (!CodeItemDumper::DecodeCompactCodeItem(ci, regs, ins, outs, tries, insns)) return;
+  } else {
+    // StandardDex CodeItem: 16-byte header
+    if (!IsRangeReadable(ci, 16)) return;
+    regs  = *(const uint16_t*)(ci + 0);
+    ins   = *(const uint16_t*)(ci + 2);
+    outs  = *(const uint16_t*)(ci + 4);
+    tries = *(const uint16_t*)(ci + 6);
+    insns = *(const uint32_t*)(ci + 12);
+  }
+
   if (insns == 0 || insns > 524288) return;
 
   if (!g_config.enable_codeitem_dump || g_codeitem_dumper == nullptr) return;
@@ -555,9 +845,14 @@ void LoadMethodHook(void* class_linker, void* dex_file_ptr, void* class_method_p
   // Compute dex_key from code_item base page
   uintptr_t ci_page = (uintptr_t)ci & ~0xFFFULL;
   snprintf(citask.dex_key, sizeof(citask.dex_key), "%lx", ci_page);
-  citask.dump_size = CodeItemDumper::CalculateCodeItemSize(ci, tries, insns);
+  if (is_compact_dex) {
+    citask.dump_size = CodeItemDumper::CalculateCompactCodeItemSize(ci, tries, insns);
+  } else {
+    citask.dump_size = CodeItemDumper::CalculateCodeItemSize(ci, tries, insns);
+  }
   citask.dump_complete = true;
   snprintf(citask.source, sizeof(citask.source), "LoadMethod");
+  snprintf(citask.process_name, sizeof(citask.process_name), "%s", g_package);
 
   if (citask.CopyData(ci, citask.dump_size)) {
     int rc = g_codeitem_dumper->QueueDump(citask);
@@ -598,10 +893,15 @@ static bool SetupHooks() {
   if (!define_class_addr) { LOGE("DefineClass not found"); return false; }
   LOGI("Found DefineClass at %p", define_class_addr);
 
-  // Hook
-  g_define_hook = new Arm64InlineHook();
-  if (!g_define_hook->Hook(define_class_addr, (void*)DefineClassHook, &g_define_class_orig)) {
-    LOGE("Hook failed"); delete g_define_hook; g_define_hook = nullptr; return false;
+  // Hook DefineClass (can be disabled via dump_dex=false for packer compatibility)
+  if (g_config.dump_dex) {
+    g_define_hook = new Arm64InlineHook();
+    if (!g_define_hook->Hook(define_class_addr, (void*)DefineClassHook, &g_define_class_orig)) {
+      LOGE("Hook failed"); delete g_define_hook; g_define_hook = nullptr; return false;
+    }
+    LOGI("✅ DefineClass hooked");
+  } else {
+    LOGI("DefineClass hook skipped (dump_dex=false)");
   }
 
   g_hooks_active = true;
@@ -636,8 +936,8 @@ static bool SetupHooks() {
        g_hooks_active.load() ? "active" : "off",
        g_artmethod_hook_active.load() ? "active" : "off");
 
-  // Stage 2.4: Init CodeItem dumper (only when enabled)
-  if (g_config.enable_codeitem_dump && g_config.enable_artmethod_hook) {
+  // Stage 2.4: Init CodeItem dumper (when enabled, independent of ArtMethod hook)
+  if (g_config.enable_codeitem_dump) {
     std::string codeitem_dir = g_config.dump_dir;
     g_codeitem_dumper = new CodeItemDumper();
     if (!g_codeitem_dumper->Init(codeitem_dir.c_str(), g_config.max_codeitem_dumps)) {
@@ -718,6 +1018,35 @@ void fart_on_app_specialize(JNIEnv* env, const char* package_name, const char* m
     LOGI("dump_dir is writable: %s", g_config.dump_dir.c_str());
   }
 
+  // === No-hook mode: dump DEX by scanning memory maps (SYNCHRONOUS, no delay) ===
+  // When dump_dex_delay_ms > 0 and dump_dex=false, skip ALL native hooks
+  // and use memory scanning instead. This avoids detection by packers
+  // that check for inline hooks (e.g., 邦邦加固/KADP).
+  // IMPORTANT: Must be synchronous and fast so that fart_on_app_specialize()
+  // returns quickly, allowing the Zygisk loader to dlclose safely.
+  // NOTE: We do NOT use DexDumper (which starts a worker thread) because
+  // the thread holds a reference to the SO, preventing dlclose from unloading.
+  // Instead, we use WriteDexSync for direct file writes.
+  if (g_config.dump_dex_delay_ms > 0 && !g_config.dump_dex) {
+    LOGI("No-hook mode (sync): dump_dex_delay_ms=%u, skipping all native hooks",
+         g_config.dump_dex_delay_ms);
+
+    // Do NOT initialize DexDumper - its worker thread prevents dlclose!
+    // Just use WriteDexSync for direct file writes.
+
+    // Immediate scan without delay (blocking in postAppSpecialize crashes)
+    LOGI("No-hook sync: starting immediate DEX scan (pid=%d)", getpid());
+
+    // Scan /proc/self/maps for DEX regions (sync write, no worker thread)
+    DumpDexFromMaps(true /* sync */);
+
+    // Skip DumpAlreadyLoadedDex - it requires DexDumper which starts a worker thread
+
+    LOGI("No-hook sync: all dumps complete, safe to dlclose");
+    return;  // Skip SetupHooks entirely
+  }
+
+  // === Normal mode: install native hooks ===
   // Setup hooks
   if (SetupHooks()) {
     // Snapshot: dump already-loaded dex files

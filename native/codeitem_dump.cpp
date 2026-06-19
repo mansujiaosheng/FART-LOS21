@@ -171,6 +171,7 @@ CodeItemDumpTask::CodeItemDumpTask() {
   sha256_prefix[0] = '\0';
   source[0] = '\0';
   dex_key[0] = '\0';
+  process_name[0] = '\0';
 }
 
 CodeItemDumpTask::~CodeItemDumpTask() {
@@ -282,6 +283,7 @@ int CodeItemDumper::QueueDump(const CodeItemDumpTask& task) {
   copy.dump_size = task.dump_size;
   copy.dump_complete = task.dump_complete;
   memcpy(copy.sha256_prefix, task.sha256_prefix, 17);
+  memcpy(copy.process_name, task.process_name, 64);
 
   if (!copy.CopyData(task.data, task.dump_size)) {
     LOGE("codeitem_dump: CopyData failed");
@@ -372,6 +374,158 @@ bool CodeItemDumper::IsValidCodeItem(const CodeItemDumpTask& task) {
 }
 
 // -----------------------------------------------------------------------
+// CompactDex CodeItem decoding
+// -----------------------------------------------------------------------
+// CompactDexFile::CodeItem layout (from compact_dex_file.h):
+//   offset 0x00: fields_ (uint16_t) — packed [regs:4|ins:4|outs:4|tries:4]
+//   offset 0x02: insns_count_and_flags_ (uint16_t) — [5bit flags|11bit insns_size]
+//   offset 0x04: insns_[1] (uint16_t[])
+//
+// PreHeader mechanism: when field values exceed 4-bit/11-bit range,
+// extra uint16_t values are inserted BEFORE the CodeItem (lower address).
+// Flags in insns_count_and_flags_ indicate which preheader fields exist.
+//
+// Bit layout of fields_:
+//   bits [15:12] = registers_size (low 4 bits, actual = decoded + ins_size)
+//   bits [11:8]  = ins_size (low 4 bits)
+//   bits [7:4]   = outs_size (low 4 bits)
+//   bits [3:0]   = tries_size (low 4 bits)
+//
+// Bit layout of insns_count_and_flags_:
+//   bits [15:5]  = insns_size_in_code_units (low 11 bits, max 2047)
+//   bit 4        = kFlagPreHeaderInsnsSize
+//   bit 3        = kFlagPreHeaderTriesSize
+//   bit 2        = kFlagPreHeaderOutsSize
+//   bit 1        = kFlagPreHeaderInsSize
+//   bit 0        = kFlagPreHeaderRegistersSize
+
+static const uint16_t kCompactFlagPreHeaderRegistersSize = 0x0001;
+static const uint16_t kCompactFlagPreHeaderInsSize       = 0x0002;
+static const uint16_t kCompactFlagPreHeaderOutsSize      = 0x0004;
+static const uint16_t kCompactFlagPreHeaderTriesSize     = 0x0008;
+static const uint16_t kCompactFlagPreHeaderInsnsSize     = 0x0010;
+static const int kCompactInsnsSizeShift = 5;
+
+bool CodeItemDumper::DecodeCompactCodeItem(const uint8_t* compact_ci,
+                                            uint16_t& out_regs, uint16_t& out_ins,
+                                            uint16_t& out_outs, uint16_t& out_tries,
+                                            uint32_t& out_insns) {
+  if (compact_ci == nullptr) return false;
+
+  // Read fields_ and insns_count_and_flags_
+  uint16_t fields = *(const uint16_t*)(compact_ci + 0);
+  uint16_t insns_count_and_flags = *(const uint16_t*)(compact_ci + 2);
+
+  // Decode inline values
+  uint16_t regs_low  = (fields >> 12) & 0xF;
+  uint16_t ins_low   = (fields >> 8) & 0xF;
+  uint16_t outs_low  = (fields >> 4) & 0xF;
+  uint16_t tries_low = fields & 0xF;
+  uint32_t insns_low = (insns_count_and_flags >> kCompactInsnsSizeShift) & 0x7FF;
+
+  // Decode preheader values by walking backwards from CodeItem start
+  // Preheader order (from CodeItem address going backwards):
+  //   -1: insns_size low16 (if kFlagPreHeaderInsnsSize)
+  //   -2: insns_size high16 (if kFlagPreHeaderInsnsSize)
+  //   -3: registers_size (if kFlagPreHeaderRegistersSize)
+  //   -4: ins_size (if kFlagPreHeaderInsSize)
+  //   -5: outs_size (if kFlagPreHeaderOutsSize)
+  //   -6: tries_size (if kFlagPreHeaderTriesSize)
+  const uint16_t* preheader = reinterpret_cast<const uint16_t*>(compact_ci);
+  int preheader_idx = -1;  // walk backwards
+
+  uint32_t insns_extra = 0;
+  uint16_t regs_extra = 0;
+  uint16_t ins_extra = 0;
+  uint16_t outs_extra = 0;
+  uint16_t tries_extra = 0;
+
+  if (insns_count_and_flags & kCompactFlagPreHeaderInsnsSize) {
+    uint16_t insns_lo = preheader[preheader_idx--];
+    uint16_t insns_hi = preheader[preheader_idx--];
+    insns_extra = ((uint32_t)insns_hi << 16) | insns_lo;
+  }
+
+  if (insns_count_and_flags & kCompactFlagPreHeaderRegistersSize) {
+    regs_extra = preheader[preheader_idx--];
+  }
+
+  if (insns_count_and_flags & kCompactFlagPreHeaderInsSize) {
+    ins_extra = preheader[preheader_idx--];
+  }
+
+  if (insns_count_and_flags & kCompactFlagPreHeaderOutsSize) {
+    outs_extra = preheader[preheader_idx--];
+  }
+
+  if (insns_count_and_flags & kCompactFlagPreHeaderTriesSize) {
+    tries_extra = preheader[preheader_idx--];
+  }
+
+  // Compute final values
+  out_ins   = ins_low + (ins_extra << 4);
+  out_outs  = outs_low + (outs_extra << 4);
+  out_tries = tries_low + (tries_extra << 4);
+  out_insns = insns_low + (insns_extra << 11);
+  // registers_size = decoded_value + ins_size (per CompactDex spec)
+  out_regs  = regs_low + (regs_extra << 4) + out_ins;
+
+  // Basic validation
+  if (out_insns == 0 || out_insns > 524288) return false;
+  if (out_regs > 65535 || out_ins > 65535 || out_outs > 65535) return false;
+
+  return true;
+}
+
+size_t CodeItemDumper::CalculateCompactCodeItemSize(const uint8_t* compact_ci,
+                                                     uint16_t tries_size,
+                                                     uint32_t insns_size) {
+  // CompactDex CodeItem: 4-byte header + instructions
+  // Preheader size needs to be accounted for if we want the full dump
+  // But for size calculation from the CodeItem start (not including preheader):
+  size_t size = 4 + (size_t)insns_size * 2;  // header + insns
+
+  if (tries_size > 0) {
+    // CompactDex uses 2-byte alignment (not 4-byte like StandardDex)
+    if (insns_size & 1) size += 2;
+
+    // try_items: each is 8 bytes
+    size += (size_t)tries_size * 8;
+
+    // Parse encoded_catch_handler_list (same LEB128 format as StandardDex)
+    const uint8_t* ptr = compact_ci + size;
+    uint32_t handlers_size = 0;
+    uint32_t shift = 0;
+    while (*ptr & 0x80) { handlers_size |= (*ptr & 0x7F) << shift; shift += 7; ptr++; }
+    handlers_size |= (*ptr & 0x7F) << shift; ptr++;
+
+    for (uint32_t h = 0; h < handlers_size; h++) {
+      int32_t handler_size = 0;
+      shift = 0;
+      while (*ptr & 0x80) { handler_size |= (*ptr & 0x7F) << shift; shift += 7; ptr++; }
+      handler_size |= (*ptr & 0x7F) << shift; ptr++;
+      if (handler_size & (1 << (shift < 7 ? 6 : (shift - 1)))) {
+        handler_size |= -1 << (shift < 7 ? 7 : (shift + 1));
+      }
+      size += (ptr - (compact_ci + size));
+      uint32_t count = (uint32_t)(handler_size > 0 ? handler_size : -handler_size);
+      for (uint32_t i = 0; i < count; i++) {
+        while (*ptr & 0x80) { size++; ptr++; }
+        size++; ptr++;
+        while (*ptr & 0x80) { size++; ptr++; }
+        size++; ptr++;
+      }
+      if (handler_size <= 0) {
+        while (*ptr & 0x80) { size += 2; ptr++; }
+        size++; ptr++;
+      }
+    }
+  }
+
+  return size;
+}
+
+// -----------------------------------------------------------------------
 // Directory & file writing
 // -----------------------------------------------------------------------
 bool CodeItemDumper::EnsureMethodsDir() {
@@ -422,6 +576,7 @@ bool CodeItemDumper::WriteJsonFile(const CodeItemDumpTask& task) {
       "{\n"
       "  \"dex_key\": \"%s\",\n"
       "  \"pid\": %d,\n"
+      "  \"process_name\": \"%s\",\n"
       "  \"tid\": %d,\n"
       "  \"method_idx\": %u,\n"
       "  \"sha256_prefix\": \"%.16s\",\n"
@@ -435,7 +590,7 @@ bool CodeItemDumper::WriteJsonFile(const CodeItemDumpTask& task) {
       "  \"source\": \"%s\"\n"
       "}\n",
       task.dex_key,
-      task.pid, task.tid,
+      task.pid, task.process_name, task.tid,
       task.method_idx, task.sha256_prefix,
       task.registers_size, task.ins_size, task.outs_size,
       task.tries_size, task.insns_size,
@@ -502,13 +657,14 @@ bool CodeItemDumper::AppendCsv(const CodeItemDumpTask& task) {
     return false;
   }
 
-  char line[512];
-  int n = snprintf(line, sizeof(line), "%s,%u,%.16s,%u,%zu,%s,%s,%u,%u,%u,%u\n",
+  char line[640];
+  int n = snprintf(line, sizeof(line), "%s,%u,%.16s,%u,%zu,%s,%s,%d,%.63s,%u,%u,%u,%u\n",
                    task.dex_key,
                    task.method_idx, task.sha256_prefix,
                    task.insns_size, task.dump_size,
                    task.dump_complete ? "complete" : "partial",
                    task.source,
+                   task.pid, task.process_name,
                    task.registers_size, task.ins_size, task.outs_size, task.tries_size);
   write(fd, line, (size_t)(n < (int)sizeof(line) ? n : (int)sizeof(line) - 1));
   close(fd);
@@ -537,7 +693,7 @@ void CodeItemDumper::WorkerLoop() {
       snprintf(filename, sizeof(filename), "%s/methods/method_index.csv", dir.c_str());
       int fd = open(filename, O_CREAT | O_WRONLY | O_TRUNC, 0644);
       if (fd >= 0) {
-        const char* header = "dex_key,method_idx,sha256_prefix,insns_size,dump_size,status,source,registers_size,ins_size,outs_size,tries_size\n";
+        const char* header = "dex_key,method_idx,sha256_prefix,insns_size,dump_size,status,source,pid,process_name,registers_size,ins_size,outs_size,tries_size\n";
         write(fd, header, strlen(header));
         close(fd);
       }

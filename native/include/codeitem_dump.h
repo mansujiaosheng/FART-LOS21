@@ -29,11 +29,14 @@ struct CodeItemDumpTask {
   // SHA256 first 8 hex chars for dedup
   char sha256_prefix[17];
 
-  // Source of this dump: "ArtMethodInvoke" or "active_invoke"
+  // Source of this dump: "ArtMethodInvoke" or "active_invoke" or "LoadMethod"
   char source[32];
 
   // DexFile identifier: sha1(begin[0:4096] + dex_size)[:16] hex
   char dex_key[17];
+
+  // Process name for session isolation
+  char process_name[64];
 
   CodeItemDumpTask();
   ~CodeItemDumpTask();
@@ -58,6 +61,7 @@ struct CodeItemDumpTask {
     memcpy(sha256_prefix, other.sha256_prefix, 17);
     memcpy(source, other.source, 32);
     memcpy(dex_key, other.dex_key, 17);
+    memcpy(process_name, other.process_name, 64);
     other.data = nullptr;
     other.dump_size = 0;
   }
@@ -79,6 +83,7 @@ struct CodeItemDumpTask {
       memcpy(sha256_prefix, other.sha256_prefix, 17);
       memcpy(source, other.source, 32);
       memcpy(dex_key, other.dex_key, 17);
+      memcpy(process_name, other.process_name, 64);
       other.data = nullptr;
       other.dump_size = 0;
     }
@@ -139,6 +144,19 @@ class CodeItemDumper {
  public:
   // Calculate complete code_item size including try/catch handlers
   static size_t CalculateCodeItemSize(const uint8_t* code_item, uint16_t tries_size, uint32_t insns_size);
+
+  // Decode CompactDex CodeItem header into standard fields
+  // Returns true if this is a valid CompactDex CodeItem
+  // compact_ci: pointer to the CompactDex CodeItem (fields_ at offset 0)
+  // out_regs, out_ins, out_outs, out_tries, out_insns: output decoded values
+  static bool DecodeCompactCodeItem(const uint8_t* compact_ci,
+                                     uint16_t& out_regs, uint16_t& out_ins,
+                                     uint16_t& out_outs, uint16_t& out_tries,
+                                     uint32_t& out_insns);
+
+  // Calculate complete CompactDex CodeItem size
+  static size_t CalculateCompactCodeItemSize(const uint8_t* compact_ci,
+                                              uint16_t tries_size, uint32_t insns_size);
 
   // Ensure methods directory exists
   bool EnsureMethodsDir();

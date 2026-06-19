@@ -397,19 +397,21 @@ def load_code_records(csv_path, code_dir):
     with open(csv_path, 'r', errors='replace') as f:
         header = f.readline().strip()
         cols = header.split(',')
-        # Determine column layout (support both old and new CSV)
+        # Determine column layout by checking header
+        # Old format: dex_key,method_idx,sha256_prefix,insns_size,dump_size,status,source,registers_size,...
+        # New format: dex_key,method_idx,sha256_prefix,insns_size,dump_size,status,source,pid,process_name,registers_size,...
+        has_pid_col = 'pid' in cols and 'process_name' in cols
+
         for line in f:
             parts = line.strip().split(',')
             if len(parts) < 5:
                 continue
             try:
                 if cols[0] == 'dex_key':
-                    # New format: dex_key,method_idx,sha256_prefix,...
                     rec = CodeRecord()
                     rec.dex_key = parts[0]
                     idx = 1
                 else:
-                    # Old format: method_idx,sha256_prefix,...
                     rec = CodeRecord()
                     rec.dex_key = ''
                     idx = 0
@@ -420,6 +422,10 @@ def load_code_records(csv_path, code_dir):
                 rec.status = parts[idx]; idx += 1
                 if idx < len(parts):
                     rec.source = parts[idx]; idx += 1
+                # Skip pid and process_name columns in new format
+                if has_pid_col:
+                    if idx < len(parts): idx += 1  # pid
+                    if idx < len(parts): idx += 1  # process_name
                 if idx < len(parts):
                     rec.registers_size = int(parts[idx]); idx += 1
                 if idx < len(parts):
@@ -468,13 +474,64 @@ def scan_code_files(code_dir):
     return records
 
 
+def merge_code_records(record_sets):
+    """Merge multiple code record dicts with dedup strategy.
+
+    Strategy: same (dex_key, method_idx) -> keep the record with the largest dump_size.
+    This handles cross-session dedup where different app runs may capture
+    different subsets of methods.
+
+    Args:
+        record_sets: list of dicts, each mapping (dex_key, method_idx) -> CodeRecord
+
+    Returns:
+        Single merged dict with dedup applied.
+    """
+    merged = {}
+    stats = {'total_input': 0, 'duplicates': 0, 'merged': 0}
+    for records in record_sets:
+        for key, rec in records.items():
+            stats['total_input'] += 1
+            if key not in merged:
+                merged[key] = rec
+                stats['merged'] += 1
+            else:
+                # Keep the one with larger dump_size (more complete data)
+                existing = merged[key]
+                if rec.dump_size > existing.dump_size:
+                    merged[key] = rec
+                    stats['duplicates'] += 1
+                else:
+                    stats['duplicates'] += 1
+    print(f"[*] Merge: {stats['total_input']} total -> {stats['merged']} unique, "
+          f"{stats['duplicates']} duplicates resolved (keep largest)")
+    return merged
+
+
 # ------ Main repair logic ------
 
-def repair(dex_path, code_dir, csv_path, out_path, carrier_path=None, session_pid=None):
+def repair(dex_path, code_dir, csv_path, out_path, carrier_path=None, session_pid=None, extra_code_dirs=None):
     print(f"[*] Loading DEX: {dex_path}")
     with open(dex_path, 'rb') as f:
         dex_data = f.read()
     dex = DexFile(dex_data)
+
+    # Load primary code records
+    code_records = load_code_records(csv_path, code_dir) if csv_path else scan_code_files(code_dir)
+
+    # Merge extra code directories (cross-session dedup)
+    if extra_code_dirs:
+        record_sets = [code_records]
+        for extra_dir in extra_code_dirs:
+            extra_csv = os.path.join(extra_dir, 'method_index.csv')
+            extra_methods = os.path.join(extra_dir, 'methods') if os.path.isdir(os.path.join(extra_dir, 'methods')) else extra_dir
+            if os.path.exists(extra_csv):
+                extra_records = load_code_records(extra_csv, extra_methods)
+            else:
+                extra_records = scan_code_files(extra_methods)
+            print(f"[*] Extra dir {extra_dir}: {len(extra_records)} records")
+            record_sets.append(extra_records)
+        code_records = merge_code_records(record_sets)
 
     # If carrier DEX provided, use it as structural base
     if carrier_path and os.path.exists(carrier_path):
@@ -674,10 +731,13 @@ def main():
     parser.add_argument('--out', required=True, help='Output repaired DEX path')
     parser.add_argument('--session-pid', type=int, default=0,
                         help='Filter code records by PID (session isolation)')
+    parser.add_argument('--extra-code-dirs', nargs='*', default=None,
+                        help='Extra dump directories to merge (cross-session dedup, keep largest)')
     args = parser.parse_args()
 
     repair(args.dex, args.code_dir, args.csv or '', args.out, args.carrier_dex or None,
-           session_pid=args.session_pid or None)
+           session_pid=args.session_pid or None,
+           extra_code_dirs=args.extra_code_dirs)
 
 
 if __name__ == '__main__':

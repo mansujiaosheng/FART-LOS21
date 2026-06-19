@@ -32,6 +32,11 @@ struct Config {
   bool active_invoke_skip_execute = true;
   std::vector<std::string> active_invoke_classes;
 
+  // No-hook DEX dump: scan /proc/self/maps for DEX regions after delay
+  // When dump_dex_delay_ms > 0 and dump_dex=false, no native hooks are installed.
+  // Instead, a background thread scans memory for DEX files after the delay.
+  uint32_t dump_dex_delay_ms = 0;
+
   bool IsAllowed(const char* package_name) const;
 };
 
