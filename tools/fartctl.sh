@@ -6,8 +6,9 @@
 
 CONFIG_PATH="/data/local/tmp/fart/config.json"
 MODULE_DIR="/data/adb/modules/fart-los21"
+NHDD="/data/local/tmp/nhdd"
 DEX_SCANNER="/data/local/tmp/dex_scanner"
-DEFAULT_DUMP_DIR="/data/local/tmp/fart_dump"
+DEFAULT_DUMP_DIR="/data/local/tmp/nhdd_dump"
 
 # Colors (if terminal supports)
 R='\033[0;31m'
@@ -270,7 +271,7 @@ set_dumpdir() {
     echo "${G}Dump directory set to: $dir${N}"
 }
 
-# ---- DEX Scanner ----
+# ---- DEX Scanner (prefers NHDD over old dex_scanner) ----
 scan_dex() {
     local pkg="$1"
     if [ -z "$pkg" ]; then
@@ -279,29 +280,38 @@ scan_dex() {
     fi
     [ -z "$pkg" ] && { echo "${R}No package specified. Usage: fartctl scan <package>${N}"; return 1; }
 
-    if [ ! -x "$DEX_SCANNER" ]; then
-        echo "${R}dex_scanner not found at $DEX_SCANNER${N}"
-        echo "Push it with: adb push dex_scanner /data/local/tmp/dex_scanner"
-        return 1
-    fi
-
-    local pid=$(pidof "$pkg" 2>/dev/null || echo "")
-    if [ -z "$pid" ]; then
-        echo "${R}App $pkg is not running!${N}"
-        echo "Launch the app first, then run this command."
+    # Use NHDD (supports package name) or fallback to dex_scanner (PID only)
+    local scanner=""
+    if [ -x "$NHDD" ]; then
+        scanner="$NHDD"
+    elif [ -x "$DEX_SCANNER" ]; then
+        scanner="$DEX_SCANNER"
+    else
+        echo "${R}No DEX scanner found!${N}"
+        echo "Push NHDD: adb push nhdd /data/local/tmp/nhdd"
         return 1
     fi
 
     local dump_dir=$(json_get_str dump_dir "$CONFIG_PATH")
     dump_dir=${dump_dir:-$DEFAULT_DUMP_DIR}
 
-    echo "${B}===== Running dex_scanner =====${N}"
-    echo "  Package: ${Y}${pkg}${N}"
-    echo "  PID:     ${Y}${pid}${N}"
+    echo "${B}===== Running ${scanner##*/} =====${N}"
+    echo "  Target:  ${Y}${pkg}${N}"
     echo "  Output:  ${Y}${dump_dir}${N}"
     echo ""
 
-    $DEX_SCANNER "$pid" "$dump_dir"
+    if [ "$scanner" = "$NHDD" ]; then
+        # NHDD accepts package name directly
+        $NHDD "$pkg" "$dump_dir"
+    else
+        # dex_scanner needs PID
+        local pid=$(pidof "$pkg" 2>/dev/null || echo "")
+        if [ -z "$pid" ]; then
+            echo "${R}App $pkg is not running!${N}"
+            return 1
+        fi
+        $DEX_SCANNER "$pid" "$dump_dir"
+    fi
 
     echo ""
     echo "${G}Scan complete. DEX files saved to: $dump_dir${N}"
